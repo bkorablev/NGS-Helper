@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRISPResso2 Batch Prep</title>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
@@ -554,6 +555,9 @@
   <div class="step-tab" id="tab-5" onclick="goStep(5)">
     <div class="step-num">5</div> Export
   </div>
+  <div class="step-tab" id="tab-6" onclick="goStep(6)" style="margin-left:auto;border-left:1px solid var(--border)">
+    <div class="step-num">6</div> Results
+  </div>
 </div>
 
 <main>
@@ -686,6 +690,51 @@
   </div>
 
   <div id="copy-confirm" style="display:none;color:var(--accent2);font-size:13px;margin-top:8px">✓ Copied to clipboard!</div>
+</div>
+
+<!-- STEP 6: Results Aggregator -->
+<div class="panel" id="panel-6">
+  <h2>Results Aggregator</h2>
+  <p class="subtitle">Select your CRISPRessoBatch output folder to summarise editing efficiency across all samples. In Chrome, selecting the folder will include all subfolders automatically.</p>
+
+  <div class="card">
+    <div class="card-title">Output Folder</div>
+    <div class="inline-row" style="align-items:center">
+      <label class="btn btn-secondary" for="results-input" style="cursor:pointer">Browse folder…</label>
+      <input type="file" id="results-input" webkitdirectory multiple style="display:none" onchange="loadResults(this.files)">
+      <span id="results-folder-label" style="color:var(--muted);font-size:13px;font-family:var(--mono)"></span>
+    </div>
+  </div>
+
+  <div id="results-content" style="display:none">
+    <div class="card">
+      <div class="card-title">Summary</div>
+      <div class="table-wrap" id="results-table-wrap"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Editing breakdown</div>
+      <div id="results-chart-wrap"></div>
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;font-family:var(--mono)">
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#484f58" rx="2"/></svg>Unmodified</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#f85149" rx="2"/></svg>NHEJ</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#3fb950" rx="2"/></svg>HDR</span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="exportResults()">⬇ Export to Excel</button>
+    </div>
+  </div>
+
+  <div id="results-empty" style="display:none" class="card">
+    <div style="color:var(--muted);font-size:13px">No CRISPResso_on_* subfolders found in the selected folder. Make sure you selected the top-level CRISPRessoBatch output directory.</div>
+  </div>
+
+  <div id="results-errors" style="display:none" class="card">
+    <div class="card-title" style="color:var(--error)">Parse errors</div>
+    <div id="results-errors-list" style="font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px"></div>
+  </div>
 </div>
 
 </main>
@@ -1080,6 +1129,225 @@ function copyCmd() {
   const confirm = document.getElementById('copy-confirm');
   confirm.style.display = 'block';
   setTimeout(() => confirm.style.display = 'none', 2000);
+}
+
+// ─── Results aggregator ───────────────────────────────────────────────────────
+let resultsData = [];
+const parseErrors = [];
+
+function loadResults(files) {
+  const fileArr = Array.from(files);
+  parseErrors.length = 0;
+
+  if (fileArr.length) {
+    const topFolder = fileArr[0].webkitRelativePath.split('/')[0];
+    document.getElementById('results-folder-label').textContent = topFolder;
+  }
+
+  // Group files by direct CRISPResso_on_<sample> subfolder
+  const groups = {};
+  fileArr.forEach(f => {
+    const parts = f.webkitRelativePath.split('/');
+    const subIdx = parts.findIndex(p => /^CRISPResso_on_/i.test(p));
+    if (subIdx === -1) return;
+    const sub = parts[subIdx];
+    const fname = parts[parts.length - 1];
+    if (!groups[sub]) groups[sub] = {};
+    if (fname === 'CRISPResso_quantification_of_editing_frequency.txt') groups[sub].quantFile = f;
+    else if (fname === 'CRISPResso_mapping_statistics.txt') groups[sub].mapFile = f;
+  });
+
+  const subfolders = Object.keys(groups).sort();
+
+  if (!subfolders.length) {
+    document.getElementById('results-content').style.display = 'none';
+    document.getElementById('results-empty').style.display = 'block';
+    document.getElementById('results-errors').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('results-empty').style.display = 'none';
+
+  Promise.all(subfolders.map(sub => parseSample(sub, groups[sub]))).then(results => {
+    resultsData = results.filter(Boolean);
+    renderResultsTable();
+    renderResultsCharts();
+    renderParseErrors();
+    document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
+  });
+}
+
+function readFileText(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error('FileReader error'));
+    r.readAsText(file);
+  });
+}
+
+// Parse a TSV string into an array of objects keyed by header
+function parseTSV(text) {
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split('\t');
+  return lines.slice(1).map(line => {
+    const vals = line.split('\t');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h.trim()] = (vals[i] || '').trim(); });
+    return obj;
+  });
+}
+
+async function parseSample(subfolder, files) {
+  const name = subfolder.replace(/^CRISPResso_on_/i, '');
+  const result = { name, failed: false, readsInFastq: 0, alignedReads: 0, unmodified: 0, modified: 0, total: 0 };
+
+  // FILE 2: mapping statistics
+  // Columns: "READS IN FASTQ", "READS AFTER PREPROCESSING", "READS ALIGNED"
+  if (files.mapFile) {
+    try {
+      const text = await readFileText(files.mapFile);
+      const rows = parseTSV(text);
+      if (rows.length) {
+        const row = rows[0];
+        result.readsInFastq = parseInt(row['READS IN FASTQ']) || 0;
+        result.alignedReads = parseInt(row['READS ALIGNED']) || 0;
+      }
+    } catch (e) {
+      parseErrors.push(`${name}: failed to read CRISPResso_mapping_statistics.txt — ${e.message}`);
+    }
+  }
+
+  // FILE 1: quantification of editing frequency
+  // Columns: Amplicon_Name, Unmodified, Modified, Discarded, Total
+  // May have multiple data rows (one per amplicon); sum across all rows.
+  if (files.quantFile) {
+    try {
+      const text = await readFileText(files.quantFile);
+      const rows = parseTSV(text);
+      if (!rows.length) {
+        parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt has no data rows`);
+        result.failed = true;
+      } else {
+        rows.forEach(row => {
+          result.unmodified += parseInt(row['Unmodified']) || 0;
+          result.modified   += parseInt(row['Modified'])   || 0;
+          result.total      += parseInt(row['Total'])      || 0;
+        });
+      }
+    } catch (e) {
+      parseErrors.push(`${name}: failed to read CRISPResso_quantification_of_editing_frequency.txt — ${e.message}`);
+      result.failed = true;
+    }
+  } else {
+    parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt not found — sample may have failed`);
+    result.failed = true;
+  }
+
+  return result;
+}
+
+function pct(n, total) { return total ? ((n / total) * 100).toFixed(1) : '0.0'; }
+
+function renderResultsTable() {
+  let html = `<table><thead><tr>
+    <th>Sample</th>
+    <th>Reads in FASTQ</th>
+    <th>Reads aligned</th>
+    <th>Aligned %</th>
+    <th>Unmodified</th>
+    <th>Modified</th>
+    <th>Total</th>
+  </tr></thead><tbody>`;
+
+  resultsData.forEach(r => {
+    const t = r.total || 1;
+    const modColor = parseFloat(pct(r.modified, t)) > 0 ? 'var(--warn)' : 'var(--muted)';
+    if (r.failed) {
+      html += `<tr>
+        <td style="font-family:var(--mono);color:var(--error)">${r.name}</td>
+        <td colspan="6" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
+      </tr>`;
+    } else {
+      html += `<tr>
+        <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
+        <td style="font-family:var(--mono)">${r.readsInFastq.toLocaleString()}</td>
+        <td style="font-family:var(--mono)">${r.alignedReads.toLocaleString()}</td>
+        <td style="font-family:var(--mono)">${pct(r.alignedReads, r.readsInFastq || 1)}%</td>
+        <td style="font-family:var(--mono)">${r.unmodified.toLocaleString()} <span style="color:var(--muted)">(${pct(r.unmodified,t)}%)</span></td>
+        <td style="font-family:var(--mono);color:${modColor}">${r.modified.toLocaleString()} <span>(${pct(r.modified,t)}%)</span></td>
+        <td style="font-family:var(--mono)">${r.total.toLocaleString()}</td>
+      </tr>`;
+    }
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('results-table-wrap').innerHTML = html;
+}
+
+function renderResultsCharts() {
+  const good = resultsData.filter(r => !r.failed);
+  if (!good.length) { document.getElementById('results-chart-wrap').innerHTML = ''; return; }
+
+  const BAR_W = 560, BAR_H = 22, LABEL_W = 190, ROW_H = 38, PAD = 10;
+  let svg = `<svg width="100%" viewBox="0 0 ${LABEL_W + BAR_W} ${good.length * ROW_H + PAD}" style="display:block">`;
+
+  good.forEach((r, idx) => {
+    const t = r.total || 1;
+    const unmodW = (r.unmodified / t) * BAR_W;
+    const modW   = (r.modified   / t) * BAR_W;
+    const y = idx * ROW_H + PAD / 2;
+    const label = r.name.length > 24 ? r.name.slice(0, 23) + '…' : r.name;
+
+    svg += `<text x="${LABEL_W - 8}" y="${y + BAR_H/2 + 4}" text-anchor="end" fill="#7d8590" font-size="11" font-family="IBM Plex Mono,monospace">${label}</text>`;
+
+    let x = LABEL_W;
+    const seg = (w, fill, lbl) => {
+      if (w < 0.5) return;
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="${BAR_H}" fill="${fill}"/>`;
+      if (w > 38) svg += `<text x="${x + w/2}" y="${y + BAR_H/2 + 4}" text-anchor="middle" fill="#fff" font-size="10" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
+      x += w;
+    };
+    seg(unmodW, '#484f58', pct(r.unmodified, t) + '%');
+    seg(modW,   '#f85149', pct(r.modified,   t) + '%');
+  });
+
+  svg += '</svg>';
+  document.getElementById('results-chart-wrap').innerHTML = svg;
+}
+
+function renderParseErrors() {
+  const el = document.getElementById('results-errors');
+  const list = document.getElementById('results-errors-list');
+  if (!parseErrors.length) { el.style.display = 'none'; return; }
+  list.innerHTML = parseErrors.map(e => `<div style="padding:4px 0;border-bottom:1px solid var(--border)">⚠ ${e}</div>`).join('');
+  el.style.display = 'block';
+}
+
+function exportResults() {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Summary
+  const summaryRows = [
+    ['Sample', 'Reads in FASTQ', 'Reads Aligned', 'Aligned %', 'Unmodified', 'Unmodified %', 'Modified', 'Modified %', 'Total', 'Status'],
+    ...resultsData.map(r => {
+      const t = r.total || 1;
+      return [r.name, r.readsInFastq, r.alignedReads, +pct(r.alignedReads, r.readsInFastq || 1),
+              r.unmodified, +pct(r.unmodified, t), r.modified, +pct(r.modified, t), r.total,
+              r.failed ? 'Failed' : 'OK'];
+    })
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
+
+  // Sheet 2: Raw
+  const rawRows = [
+    ['Sample', 'Reads_in_FASTQ', 'Reads_aligned', 'Unmodified', 'Modified', 'Total'],
+    ...resultsData.map(r => [r.name, r.readsInFastq, r.alignedReads, r.unmodified, r.modified, r.total])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rawRows), 'Raw');
+
+  XLSX.writeFile(wb, 'crispresso_results.xlsx');
 }
 </script>
 </body>
