@@ -552,7 +552,7 @@
 <!-- STEP 3: Global Parameters -->
 <div class="panel" id="panel-3">
   <h2>Global Parameters</h2>
-  <p class="subtitle">These settings apply to all samples. They map directly to CRISPRessoWGS/Batch flags.</p>
+  <p class="subtitle">These settings apply to all samples. They map directly to CRISPRessoBatch flags.</p>
 
   <div class="card">
     <div class="card-title">Output</div>
@@ -643,7 +643,7 @@
 <!-- STEP 5: Export -->
 <div class="panel" id="panel-5">
   <h2>Export</h2>
-  <p class="subtitle">Your .batch file is ready. Download it and run CRISPRessoWGS from the same directory as your FASTQs.</p>
+  <p class="subtitle">Your .batch file is ready. Download it and run CRISPRessoBatch from the same directory as your FASTQs.</p>
 
   <div class="card">
     <div class="card-title">Preview — .batch file</div>
@@ -714,6 +714,7 @@ function handleFiles(files) {
   // Build samples from pairs
   samples = Object.entries(pairs).map(([key, val]) => ({
     name: val.sampleName || key,
+    label: val.sampleName || key,
     r1: val.r1 || '',
     r2: val.r2 || '',
     amplicon: '',
@@ -796,6 +797,7 @@ function renderSampleTable() {
   let html = `<div class="table-wrap"><table>
     <thead><tr>
       <th>#</th>
+      <th>Sample label <span style="color:var(--error)">*</span></th>
       <th>Sample name</th>
       <th>R1 file</th>
       <th>R2 file</th>
@@ -807,6 +809,9 @@ function renderSampleTable() {
   samples.forEach((s, i) => {
     html += `<tr>
       <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
+      <td class="seq-cell"><input type="text" value="${s.label}"
+        oninput="samples[${i}].label=this.value"
+        style="border-color:${s.label?'transparent':'rgba(248,81,73,0.4)'}"></td>
       <td class="sample-name-cell">${s.name}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
@@ -887,12 +892,21 @@ function runValidation() {
     checks.push({ type: 'warn', msg: `${shortGuide.length} guide(s) have unusual length (expected 17-23bp): ${shortGuide.map(s=>s.name).join(', ')}` });
   }
 
-  // Check 7: duplicate sample names
-  const names = samples.map(s => s.name);
-  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
-  if (dupes.length) {
-    checks.push({ type: 'err', msg: `Duplicate sample names: ${[...new Set(dupes)].join(', ')}` });
+  // Check 7: empty labels
+  const emptyLabel = samples.filter(s => !s.label || !s.label.trim());
+  if (emptyLabel.length) {
+    checks.push({ type: 'err', msg: `${emptyLabel.length} sample(s) have an empty label. Each sample must have a unique label.` });
     errors++;
+  }
+
+  // Check 8: duplicate labels
+  const labels = samples.map(s => s.label);
+  const dupes = labels.filter((n, i) => labels.indexOf(n) !== i);
+  if (dupes.length) {
+    checks.push({ type: 'err', msg: `Duplicate sample labels: ${[...new Set(dupes)].join(', ')}` });
+    errors++;
+  } else if (samples.length && !emptyLabel.length) {
+    checks.push({ type: 'ok', msg: 'All sample labels are unique.' });
   }
 
   // Check 8: output folder
@@ -924,7 +938,7 @@ function buildExport() {
 
   const rows = [cols.join('\t')];
   samples.forEach(s => {
-    const row = [s.name, s.r1, s.r2, s.amplicon, s.guide];
+    const row = [s.label, s.r1, s.r2, s.amplicon, s.guide];
     if (hasHDR) row.push(s.hdr_seq || '');
     rows.push(row.join('\t'));
   });
@@ -942,7 +956,7 @@ function buildExport() {
   const strict = document.getElementById('param-strict').value;
   const extra = document.getElementById('param-extra').value.trim();
 
-  let cmd = `CRISPRessoWGS --batch_settings ${batchName}`;
+  let cmd = `CRISPRessoBatch --batch_settings ${batchName}`;
   cmd += ` --output_folder ${outputDir}`;
   cmd += ` --quantification_window_size ${qw}`;
   cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
