@@ -716,9 +716,10 @@
       <div class="card-title">Editing breakdown</div>
       <div id="results-chart-wrap"></div>
       <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;font-family:var(--mono)">
-        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#484f58" rx="2"/></svg>Unmodified</span>
-        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#f85149" rx="2"/></svg>NHEJ</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#58a6ff" rx="2"/></svg>Unmodified</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#e07b39" rx="2"/></svg>NHEJ</span>
         <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#3fb950" rx="2"/></svg>HDR</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#f85149" rx="2"/></svg>Ambiguous</span>
       </div>
     </div>
 
@@ -1201,18 +1202,29 @@ function parseTSV(text) {
 
 async function parseSample(subfolder, files) {
   const name = subfolder.replace(/^CRISPResso_on_/i, '');
-  const result = { name, failed: false, readsInFastq: 0, alignedReads: 0, unmodified: 0, modified: 0, total: 0 };
+  const result = {
+    name, failed: false,
+    readsInInputs: 0, alignedAllAmplicons: 0,
+    // Reference row
+    refUnmodified: 0, nhej: 0,
+    // HDR row (only when HDR template was used)
+    hasHDR: false, hdrUnmodified: 0, hdrModified: 0, totalHDR: 0,
+    // Ambiguous = aligned - refUnmodified - nhej - totalHDR
+    ambiguous: 0,
+    // Calculated percentages (denominator = alignedAllAmplicons)
+    refUnmodifiedPct: 0, nhejPct: 0, hdrPct: 0, ambiguousPct: 0,
+    alignedPct: 0
+  };
 
   // FILE 2: mapping statistics
-  // Columns: "READS IN FASTQ", "READS AFTER PREPROCESSING", "READS ALIGNED"
   if (files.mapFile) {
     try {
       const text = await readFileText(files.mapFile);
       const rows = parseTSV(text);
       if (rows.length) {
         const row = rows[0];
-        result.readsInFastq = parseInt(row['READS IN FASTQ']) || 0;
-        result.alignedReads = parseInt(row['READS ALIGNED']) || 0;
+        result.readsInInputs       = parseInt(row['READS IN INPUTS'])       || 0;
+        result.alignedAllAmplicons = parseInt(row['READS ALIGNED'])         || 0;
       }
     } catch (e) {
       parseErrors.push(`${name}: failed to read CRISPResso_mapping_statistics.txt — ${e.message}`);
@@ -1220,8 +1232,6 @@ async function parseSample(subfolder, files) {
   }
 
   // FILE 1: quantification of editing frequency
-  // Columns: Amplicon_Name, Unmodified, Modified, Discarded, Total
-  // May have multiple data rows (one per amplicon); sum across all rows.
   if (files.quantFile) {
     try {
       const text = await readFileText(files.quantFile);
@@ -1230,11 +1240,35 @@ async function parseSample(subfolder, files) {
         parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt has no data rows`);
         result.failed = true;
       } else {
-        rows.forEach(row => {
-          result.unmodified += parseInt(row['Unmodified']) || 0;
-          result.modified   += parseInt(row['Modified'])   || 0;
-          result.total      += parseInt(row['Total'])      || 0;
-        });
+        const refRow = rows.find(r => r['Amplicon'] === 'Reference') || rows[0];
+        const hdrRow = rows.find(r => r['Amplicon'] === 'HDR');
+
+        // Prefer quant file values for totals (authoritative)
+        result.readsInInputs       = parseInt(refRow['Reads_in_input'])              || result.readsInInputs;
+        result.alignedAllAmplicons = parseInt(refRow['Reads_aligned_all_amplicons']) || result.alignedAllAmplicons;
+
+        // Reference row: Unmodified = unedited reads, Modified = NHEJ reads
+        result.refUnmodified = parseInt(refRow['Unmodified']) || 0;
+        result.nhej          = parseInt(refRow['Modified'])   || 0;
+
+        if (hdrRow) {
+          result.hasHDR      = true;
+          // HDR row: Unmodified = perfect HDR, Modified = imperfect HDR
+          result.hdrUnmodified = parseInt(hdrRow['Unmodified']) || 0;
+          result.hdrModified   = parseInt(hdrRow['Modified'])   || 0;
+          result.totalHDR      = result.hdrUnmodified + result.hdrModified;
+        }
+
+        // Ambiguous = reads not accounted for by any category
+        const aln = result.alignedAllAmplicons || 1;
+        result.ambiguous = Math.max(0, aln - result.refUnmodified - result.nhej - result.totalHDR);
+
+        // All percentages use alignedAllAmplicons as denominator
+        result.refUnmodifiedPct = +((result.refUnmodified / aln) * 100).toFixed(1);
+        result.nhejPct          = +((result.nhej          / aln) * 100).toFixed(1);
+        result.hdrPct           = +((result.totalHDR      / aln) * 100).toFixed(1);
+        result.ambiguousPct     = +((result.ambiguous     / aln) * 100).toFixed(1);
+        result.alignedPct       = +((result.alignedAllAmplicons / (result.readsInInputs || 1)) * 100).toFixed(1);
       }
     } catch (e) {
       parseErrors.push(`${name}: failed to read CRISPResso_quantification_of_editing_frequency.txt — ${e.message}`);
@@ -1251,35 +1285,40 @@ async function parseSample(subfolder, files) {
 function pct(n, total) { return total ? ((n / total) * 100).toFixed(1) : '0.0'; }
 
 function renderResultsTable() {
+  const anyHDR = resultsData.some(r => r.hasHDR);
+  const anyAmbiguous = anyHDR && resultsData.some(r => r.ambiguous > 0);
+  const NCOLS = 5 + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
+
   let html = `<table><thead><tr>
     <th>Sample</th>
-    <th>Reads in FASTQ</th>
-    <th>Reads aligned</th>
+    <th>Reads in Input</th>
+    <th>Reads Aligned</th>
     <th>Aligned %</th>
     <th>Unmodified</th>
-    <th>Modified</th>
-    <th>Total</th>
+    <th>NHEJ</th>
+    ${anyHDR ? '<th>HDR</th>' : ''}
+    ${anyAmbiguous ? '<th>Ambiguous</th>' : ''}
   </tr></thead><tbody>`;
 
   resultsData.forEach(r => {
-    const t = r.total || 1;
-    const modColor = parseFloat(pct(r.modified, t)) > 0 ? 'var(--warn)' : 'var(--muted)';
     if (r.failed) {
       html += `<tr>
         <td style="font-family:var(--mono);color:var(--error)">${r.name}</td>
-        <td colspan="6" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
+        <td colspan="${NCOLS}" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
       </tr>`;
-    } else {
-      html += `<tr>
-        <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
-        <td style="font-family:var(--mono)">${r.readsInFastq.toLocaleString()}</td>
-        <td style="font-family:var(--mono)">${r.alignedReads.toLocaleString()}</td>
-        <td style="font-family:var(--mono)">${pct(r.alignedReads, r.readsInFastq || 1)}%</td>
-        <td style="font-family:var(--mono)">${r.unmodified.toLocaleString()} <span style="color:var(--muted)">(${pct(r.unmodified,t)}%)</span></td>
-        <td style="font-family:var(--mono);color:${modColor}">${r.modified.toLocaleString()} <span>(${pct(r.modified,t)}%)</span></td>
-        <td style="font-family:var(--mono)">${r.total.toLocaleString()}</td>
-      </tr>`;
+      return;
     }
+    const nhejColor = r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)';
+    html += `<tr>
+      <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
+      <td style="font-family:var(--mono)">${r.readsInInputs.toLocaleString()}</td>
+      <td style="font-family:var(--mono)">${r.alignedAllAmplicons.toLocaleString()}</td>
+      <td style="font-family:var(--mono)">${r.alignedPct}%</td>
+      <td style="font-family:var(--mono)">${r.refUnmodified.toLocaleString()} <span style="color:var(--muted)">(${r.refUnmodifiedPct.toFixed(1)}%)</span></td>
+      <td style="font-family:var(--mono);color:${nhejColor}">${r.nhej.toLocaleString()} <span>(${r.nhejPct.toFixed(1)}%)</span></td>
+      ${anyHDR ? `<td style="font-family:var(--mono);color:var(--accent2)">${r.hasHDR ? r.totalHDR.toLocaleString() + ' <span>(' + r.hdrPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
+      ${anyAmbiguous ? `<td style="font-family:var(--mono);color:var(--muted)">${r.ambiguous > 0 ? r.ambiguous.toLocaleString() + ' <span>(' + r.ambiguousPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
+    </tr>`;
   });
 
   html += '</tbody></table>';
@@ -1294,23 +1333,22 @@ function renderResultsCharts() {
   let svg = `<svg width="100%" viewBox="0 0 ${LABEL_W + BAR_W} ${good.length * ROW_H + PAD}" style="display:block">`;
 
   good.forEach((r, idx) => {
-    const t = r.total || 1;
-    const unmodW = (r.unmodified / t) * BAR_W;
-    const modW   = (r.modified   / t) * BAR_W;
     const y = idx * ROW_H + PAD / 2;
     const label = r.name.length > 24 ? r.name.slice(0, 23) + '…' : r.name;
-
     svg += `<text x="${LABEL_W - 8}" y="${y + BAR_H/2 + 4}" text-anchor="end" fill="#7d8590" font-size="11" font-family="IBM Plex Mono,monospace">${label}</text>`;
 
     let x = LABEL_W;
-    const seg = (w, fill, lbl) => {
+    const seg = (pctVal, fill, lbl) => {
+      const w = (pctVal / 100) * BAR_W;
       if (w < 0.5) return;
       svg += `<rect x="${x}" y="${y}" width="${w}" height="${BAR_H}" fill="${fill}"/>`;
       if (w > 38) svg += `<text x="${x + w/2}" y="${y + BAR_H/2 + 4}" text-anchor="middle" fill="#fff" font-size="10" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
       x += w;
     };
-    seg(unmodW, '#484f58', pct(r.unmodified, t) + '%');
-    seg(modW,   '#f85149', pct(r.modified,   t) + '%');
+    seg(r.refUnmodifiedPct, '#58a6ff', r.refUnmodifiedPct.toFixed(1) + '%');  // blue
+    seg(r.nhejPct,          '#e07b39', r.nhejPct.toFixed(1)          + '%');  // orange
+    if (r.hasHDR)         seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');  // green
+    if (r.ambiguous > 0)  seg(r.ambiguousPct, '#f85149', r.ambiguousPct.toFixed(1) + '%');  // red
   });
 
   svg += '</svg>';
@@ -1327,24 +1365,31 @@ function renderParseErrors() {
 
 function exportResults() {
   const wb = XLSX.utils.book_new();
+  const anyHDR = resultsData.some(r => r.hasHDR);
 
   // Sheet 1: Summary
-  const summaryRows = [
-    ['Sample', 'Reads in FASTQ', 'Reads Aligned', 'Aligned %', 'Unmodified', 'Unmodified %', 'Modified', 'Modified %', 'Total', 'Status'],
-    ...resultsData.map(r => {
-      const t = r.total || 1;
-      return [r.name, r.readsInFastq, r.alignedReads, +pct(r.alignedReads, r.readsInFastq || 1),
-              r.unmodified, +pct(r.unmodified, t), r.modified, +pct(r.modified, t), r.total,
-              r.failed ? 'Failed' : 'OK'];
-    })
-  ];
+  const summaryHeaders = ['Sample', 'Reads in Input', 'Reads Aligned', 'Aligned %',
+    'Unmodified', 'Unmodified %', 'NHEJ', 'NHEJ %',
+    ...(anyHDR ? ['HDR (Perfect+Imperfect)', 'HDR %', 'Ambiguous', 'Ambiguous %'] : []),
+    'Status'];
+  const summaryRows = [summaryHeaders, ...resultsData.map(r => {
+    const row = [r.name, r.readsInInputs, r.alignedAllAmplicons, r.alignedPct,
+                 r.refUnmodified, r.refUnmodifiedPct, r.nhej, r.nhejPct];
+    if (anyHDR) row.push(r.totalHDR, r.hdrPct, r.ambiguous, r.ambiguousPct);
+    row.push(r.failed ? 'Failed' : 'OK');
+    return row;
+  })];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
 
   // Sheet 2: Raw
-  const rawRows = [
-    ['Sample', 'Reads_in_FASTQ', 'Reads_aligned', 'Unmodified', 'Modified', 'Total'],
-    ...resultsData.map(r => [r.name, r.readsInFastq, r.alignedReads, r.unmodified, r.modified, r.total])
-  ];
+  const rawHeaders = ['Sample', 'Reads_in_input', 'Reads_aligned_all_amplicons',
+    'Ref_Unmodified', 'Ref_Modified_NHEJ',
+    ...(anyHDR ? ['HDR_Unmodified', 'HDR_Modified', 'Total_HDR', 'Ambiguous'] : [])];
+  const rawRows = [rawHeaders, ...resultsData.map(r => {
+    const row = [r.name, r.readsInInputs, r.alignedAllAmplicons, r.refUnmodified, r.nhej];
+    if (anyHDR) row.push(r.hdrUnmodified, r.hdrModified, r.totalHDR, r.ambiguous);
+    return row;
+  })];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rawRows), 'Raw');
 
   XLSX.writeFile(wb, 'crispresso_results.xlsx');
