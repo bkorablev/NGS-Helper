@@ -325,6 +325,21 @@
   td:hover .fill-btn { opacity: 1; }
   .fill-btn:hover { background: rgba(63,185,80,0.2); color: var(--accent2); }
 
+  .delete-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  td:hover .delete-btn { opacity: 1; }
+  .delete-btn:hover { background: rgba(248,81,73,0.15); color: var(--error); }
+  .delete-btn:disabled { opacity: 0.15; cursor: not-allowed; }
+
   @keyframes fillFlash {
     0%   { background: rgba(63,185,80,0.25); }
     100% { background: transparent; }
@@ -793,11 +808,46 @@ dz.addEventListener('drop', e => {
 });
 
 // ─── Sample table ─────────────────────────────────────────────────────────────
-function handleEnterKey(e, row, col) {
+function updateSample(el, field) {
+  const i = parseInt(el.dataset.row);
+  let val = el.value;
+  const isSeq = field === 'amplicon' || field === 'guide' || field === 'hdr';
+  if (isSeq) { val = val.toUpperCase().replace(/[^ATCGN]/gi, ''); el.value = val; }
+  if      (field === 'label')    samples[i].label    = val;
+  else if (field === 'name')     samples[i].name     = val;
+  else if (field === 'amplicon') samples[i].amplicon = val;
+  else if (field === 'guide')    samples[i].guide    = val;
+  else if (field === 'hdr')      samples[i].hdr_seq  = val;
+}
+
+function handleEnterKey(e, el) {
   if (e.key !== 'Enter') return;
   e.preventDefault();
-  const next = document.querySelector(`input[data-row="${row + 1}"][data-col="${col}"]`);
+  const next = document.querySelector(`input[data-row="${parseInt(el.dataset.row) + 1}"][data-col="${el.dataset.col}"]`);
   if (next) next.focus();
+}
+
+function deleteSample(delBtn) {
+  const i = parseInt(delBtn.dataset.row);
+  delBtn.closest('tr').remove();
+  samples.splice(i, 1);
+
+  // Re-index data-row on all surviving rows
+  const tbody = document.querySelector('#sample-table-wrap tbody');
+  tbody.querySelectorAll('tr').forEach((tr, newIdx) => {
+    tr.querySelectorAll('[data-row]').forEach(el => { el.dataset.row = newIdx; });
+  });
+
+  // Hide fill-down buttons on the new last row
+  const lastIdx = samples.length - 1;
+  tbody.querySelectorAll('.fill-btn').forEach(fb => {
+    fb.style.display = parseInt(fb.dataset.row) >= lastIdx ? 'none' : '';
+  });
+
+  // Disable delete buttons if only 1 sample remains
+  tbody.querySelectorAll('.delete-btn').forEach(db => {
+    db.disabled = samples.length <= 1;
+  });
 }
 
 function fillDown(row, col) {
@@ -839,38 +889,41 @@ function renderSampleTable() {
       <th>Amplicon sequence <span style="color:var(--error)">*</span></th>
       <th>Guide RNA (spacer) <span style="color:var(--error)">*</span></th>
       <th>HDR template <span style="color:var(--muted)">(opt)</span></th>
+      <th></th>
     </tr></thead><tbody>`;
 
+  const single = samples.length === 1;
   samples.forEach((s, i) => {
     const notLast = i < samples.length - 1;
-    const fb = col => notLast ? `<button class="fill-btn" onclick="fillDown(${i},'${col}')" title="Fill down">↓</button>` : '';
+    const fb = col => notLast ? `<button class="fill-btn" data-row="${i}" data-col="${col}" onclick="fillDown(+this.dataset.row,this.dataset.col)" title="Fill down">↓</button>` : '';
     html += `<tr>
       <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
       <td class="label-cell"><div class="fill-wrap"><input type="text" value="${s.label}" placeholder="Custom label"
         data-row="${i}" data-col="label"
-        oninput="samples[${i}].label=this.value"
-        onkeydown="handleEnterKey(event,${i},'label')"
+        oninput="updateSample(this,'label')"
+        onkeydown="handleEnterKey(event,this)"
         style="border-color:${s.label?'transparent':'rgba(248,81,73,0.4)'}">${fb('label')}</div></td>
       <td class="sample-name-cell"><div class="fill-wrap"><input type="text" value="${s.name}"
         data-row="${i}" data-col="name"
-        oninput="samples[${i}].name=this.value"
-        onkeydown="handleEnterKey(event,${i},'name')">${fb('name')}</div></td>
+        oninput="updateSample(this,'name')"
+        onkeydown="handleEnterKey(event,this)">${fb('name')}</div></td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
       <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
         data-row="${i}" data-col="amplicon"
-        oninput="samples[${i}].amplicon=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].amplicon"
-        onkeydown="handleEnterKey(event,${i},'amplicon')"
+        oninput="updateSample(this,'amplicon')"
+        onkeydown="handleEnterKey(event,this)"
         style="border-color:${s.amplicon?'transparent':'rgba(248,81,73,0.4)'}">${fb('amplicon')}</div></td>
       <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="ATCG…" value="${s.guide}"
         data-row="${i}" data-col="guide"
-        oninput="samples[${i}].guide=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].guide"
-        onkeydown="handleEnterKey(event,${i},'guide')"
+        oninput="updateSample(this,'guide')"
+        onkeydown="handleEnterKey(event,this)"
         style="border-color:${s.guide?'transparent':'rgba(248,81,73,0.4)'}">${fb('guide')}</div></td>
       <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="optional" value="${s.hdr_seq||''}"
         data-row="${i}" data-col="hdr"
-        oninput="samples[${i}].hdr_seq=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].hdr_seq"
-        onkeydown="handleEnterKey(event,${i},'hdr')">${fb('hdr')}</div></td>
+        oninput="updateSample(this,'hdr')"
+        onkeydown="handleEnterKey(event,this)">${fb('hdr')}</div></td>
+      <td><button class="delete-btn" data-row="${i}" onclick="deleteSample(this)" title="Delete row"${single?' disabled':''}>×</button></td>
     </tr>`;
   });
 
