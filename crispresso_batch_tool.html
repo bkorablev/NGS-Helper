@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRISPResso2 Batch Prep</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #d29922;
+    --error: #f85149;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .logo span { color: var(--accent2); }
+
+  header p {
+    color: var(--muted);
+    font-size: 13px;
+    border-left: 1px solid var(--border);
+    padding-left: 16px;
+    margin-left: 4px;
+  }
+
+  /* Steps nav */
+  .steps-nav {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0 32px;
+    gap: 0;
+  }
+
+  .step-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .step-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  .step-tab.done {
+    color: var(--accent2);
+  }
+
+  .step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+
+  .step-tab.active .step-num { background: var(--accent); color: #000; border-color: var(--accent); }
+  .step-tab.done .step-num { background: var(--accent2); color: #000; border-color: var(--accent2); }
+
+  /* Main layout */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 48px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.05);
+  }
+
+  .dropzone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .dropzone-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+
+  .dropzone p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .dropzone p strong { color: var(--text); }
+
+  /* File list */
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .file-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .badge-r1 { background: rgba(88,166,255,0.2); color: var(--accent); }
+  .badge-r2 { background: rgba(63,185,80,0.2); color: var(--accent2); }
+  .badge-unpaired { background: rgba(248,81,73,0.2); color: var(--error); }
+
+  /* Form elements */
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+
+  input[type=text], textarea, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  input[type=text]:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  textarea { resize: vertical; min-height: 60px; }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .form-group { margin-bottom: 14px; }
+
+  /* Sample table */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead {
+    background: var(--surface2);
+    position: sticky;
+    top: 0;
+  }
+
+  th {
+    padding: 10px 12px;
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  td input[type=text] {
+    padding: 5px 8px;
+    font-size: 12px;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  td input[type=text]:focus {
+    background: var(--bg);
+    border-color: var(--accent);
+  }
+
+  .sample-name-cell {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 160px;
+  }
+
+  .seq-cell input { min-width: 200px; font-size: 11px; }
+
+  /* Validation */
+  .validation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .val-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .val-ok { background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); }
+  .val-warn { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); }
+  .val-err { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); }
+
+  .val-icon { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: #79baff; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-success {
+    background: var(--accent2);
+    color: #000;
+    border-color: var(--accent2);
+  }
+  .btn-success:hover { background: #56d364; }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    align-items: center;
+  }
+
+  /* Output */
+  .output-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--accent2);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .cmd-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .cmd-box span { color: var(--accent2); flex-shrink: 0; }
+
+  /* Tags / chips */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--mono);
+    background: rgba(88,166,255,0.15);
+    color: var(--accent);
+    margin: 2px;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+
+  .stat { text-align: center; }
+  .stat-val { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Range / number */
+  .inline-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .inline-row input[type=text] { width: auto; }
+
+  /* Tooltip */
+  [data-tip] { position: relative; cursor: help; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%; transform: translateX(-50%);
+    background: #000;
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    border: 1px solid var(--border);
+    z-index: 100;
+    font-family: var(--sans);
+    pointer-events: none;
+  }
+
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+
+  .helper-text {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  .paste-hint {
+    font-size: 12px;
+    color: var(--warn);
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: rgba(210,153,34,0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(210,153,34,0.3);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px;
+    color: var(--muted);
+  }
+
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">CRISPResso<span>2</span> Batch Prep</div>
+  <p>Build and validate .batch files without the headaches</p>
+</header>
+
+<div class="steps-nav">
+  <div class="step-tab active" id="tab-1" onclick="goStep(1)">
+    <div class="step-num">1</div> Load FASTQs
+  </div>
+  <div class="step-tab" id="tab-2" onclick="goStep(2)">
+    <div class="step-num">2</div> Edit Samples
+  </div>
+  <div class="step-tab" id="tab-3" onclick="goStep(3)">
+    <div class="step-num">3</div> Global Parameters
+  </div>
+  <div class="step-tab" id="tab-4" onclick="goStep(4)">
+    <div class="step-num">4</div> Validate
+  </div>
+  <div class="step-tab" id="tab-5" onclick="goStep(5)">
+    <div class="step-num">5</div> Export
+  </div>
+</div>
+
+<main>
+
+<!-- STEP 1: Load FASTQs -->
+<div class="panel active" id="panel-1">
+  <h2>Load FASTQ Files</h2>
+  <p class="subtitle">Select your paired-end FASTQ files. R1/R2 pairs are auto-detected from Illumina naming (<code style="color:var(--accent)">_R1_001</code> / <code style="color:var(--accent)">_R2_001</code>).</p>
+
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fastq-input" multiple accept=".fastq,.fastq.gz,.fq,.fq.gz" onchange="handleFiles(this.files)">
+    <div class="dropzone-icon">🧬</div>
+    <p><strong>Click to browse or drag & drop FASTQ files</strong></p>
+    <p style="margin-top:6px">Accepts .fastq, .fastq.gz, .fq, .fq.gz &nbsp;·&nbsp; Paired-end (R1 + R2)</p>
+  </div>
+
+  <div id="file-list-wrap" style="display:none">
+    <div class="stats-bar" id="stats-bar" style="margin-top:16px"></div>
+    <div class="file-list" id="file-list"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="step1-next" onclick="goStep(2)" disabled>Continue →</button>
+    <button class="btn btn-secondary" onclick="clearFiles()">Clear</button>
+  </div>
+</div>
+
+<!-- STEP 2: Edit Samples -->
+<div class="panel" id="panel-2">
+  <h2>Sample Sequences</h2>
+  <p class="subtitle">Fill in amplicon and guide sequences for each detected sample. You can paste a column from Excel into any field.</p>
+
+  <div class="paste-hint">💡 Tip: Click any cell to edit. Sequences are validated for valid DNA characters (A/T/C/G/N only).</div>
+
+  <div id="sample-table-wrap">
+    <div class="empty-state"><div class="big">🔬</div>No samples loaded yet — go back to Step 1</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+    <button class="btn btn-primary" onclick="goStep(3)">Continue →</button>
+  </div>
+</div>
+
+<!-- STEP 3: Global Parameters -->
+<div class="panel" id="panel-3">
+  <h2>Global Parameters</h2>
+  <p class="subtitle">These settings apply to all samples. They map directly to CRISPRessoWGS/Batch flags.</p>
+
+  <div class="card">
+    <div class="card-title">Output</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Output folder name</label>
+        <input type="text" id="param-output" value="CRISPRessoBatch_output" placeholder="CRISPRessoBatch_output">
+      </div>
+      <div class="form-group">
+        <label>Batch name</label>
+        <input type="text" id="param-name" value="batch" placeholder="batch">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Quantification</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-tip="Bases around cut site used for quantification">Quantification window size</label>
+        <input type="text" id="param-qw" value="1" placeholder="1">
+        <div class="helper-text">default: 1</div>
+      </div>
+      <div class="form-group">
+        <label data-tip="Minimum % frequency for alleles to be plotted">Min allele frequency to plot (%)</label>
+        <input type="text" id="param-minfreq" value="0.2" placeholder="0.2">
+        <div class="helper-text">default: 0.2</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-tip="Minimum reads to be considered for analysis">Min reads per sample</label>
+        <input type="text" id="param-minreads" value="1000" placeholder="1000">
+        <div class="helper-text">default: 1000</div>
+      </div>
+      <div class="form-group">
+        <label>Stringent filter</label>
+        <select id="param-strict">
+          <option value="0">Off (default)</option>
+          <option value="1">On</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Paired-end Merging</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-tip="Minimum overlap for FLASH merging">Min overlap (FLASH)</label>
+        <input type="text" id="param-minoverlap" value="10" placeholder="10">
+      </div>
+      <div class="form-group">
+        <label data-tip="Maximum overlap for FLASH merging">Max overlap (FLASH)</label>
+        <input type="text" id="param-maxoverlap" value="100" placeholder="100">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Additional flags <span style="color:var(--muted);font-weight:400;font-size:11px">(optional)</span></div>
+    <label>Extra command-line flags to append</label>
+    <input type="text" id="param-extra" placeholder="e.g. --keep_intermediate --max_paired_end_reads_overlap 100">
+    <div class="helper-text">These will be appended verbatim to the CRISPRessoWGS command</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+    <button class="btn btn-primary" onclick="runValidation(); goStep(4)">Validate →</button>
+  </div>
+</div>
+
+<!-- STEP 4: Validate -->
+<div class="panel" id="panel-4">
+  <h2>Validation Report</h2>
+  <p class="subtitle">Check all issues before generating your .batch file.</p>
+
+  <div class="validation-list" id="validation-list">
+    <div class="empty-state"><div class="big">🔍</div>Run validation from Step 3</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goStep(3)">← Back</button>
+    <button class="btn btn-primary" id="validate-next" onclick="goStep(5)" disabled>Generate .batch file →</button>
+  </div>
+</div>
+
+<!-- STEP 5: Export -->
+<div class="panel" id="panel-5">
+  <h2>Export</h2>
+  <p class="subtitle">Your .batch file is ready. Download it and run CRISPRessoWGS from the same directory as your FASTQs.</p>
+
+  <div class="card">
+    <div class="card-title">Preview — .batch file</div>
+    <div class="output-box" id="batch-preview"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Run command</div>
+    <div class="cmd-box">
+      <span>$</span>
+      <div id="run-cmd"></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-success" onclick="downloadBatch()">⬇ Download .batch file</button>
+    <button class="btn btn-secondary" onclick="copyCmd()">Copy run command</button>
+    <button class="btn btn-secondary" onclick="goStep(2)">← Edit samples</button>
+  </div>
+
+  <div id="copy-confirm" style="display:none;color:var(--accent2);font-size:13px;margin-top:8px">✓ Copied to clipboard!</div>
+</div>
+
+</main>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let samples = []; // [{name, r1, r2, amplicon, guide, hdr_seq, hdr_name, coding}]
+let currentStep = 1;
+let validationPassed = false;
+
+// ─── Step navigation ──────────────────────────────────────────────────────────
+function goStep(n) {
+  if (n === 5) buildExport();
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + n).classList.add('active');
+  document.getElementById('tab-' + n).classList.add('active');
+  currentStep = n;
+}
+
+// ─── File handling ────────────────────────────────────────────────────────────
+function handleFiles(files) {
+  const fileArr = Array.from(files);
+  const r1Pattern = /_R1_\d+\.(fastq|fq)(\.gz)?$/i;
+  const r2Pattern = /_R2_\d+\.(fastq|fq)(\.gz)?$/i;
+
+  const r1Files = fileArr.filter(f => r1Pattern.test(f.name));
+  const r2Files = fileArr.filter(f => r2Pattern.test(f.name));
+
+  // Build pair map by sample key (everything before _R1_)
+  const pairs = {};
+  r1Files.forEach(f => {
+    const key = f.name.replace(/_R1_\d+\.(fastq|fq)(\.gz)?$/i, '');
+    if (!pairs[key]) pairs[key] = {};
+    pairs[key].r1 = f.name;
+    pairs[key].sampleName = key;
+  });
+  r2Files.forEach(f => {
+    const key = f.name.replace(/_R2_\d+\.(fastq|fq)(\.gz)?$/i, '');
+    if (!pairs[key]) pairs[key] = {};
+    pairs[key].r2 = f.name;
+  });
+
+  // Also catch unpaired
+  const unmatched = fileArr.filter(f => !r1Pattern.test(f.name) && !r2Pattern.test(f.name));
+
+  // Build samples from pairs
+  samples = Object.entries(pairs).map(([key, val]) => ({
+    name: val.sampleName || key,
+    r1: val.r1 || '',
+    r2: val.r2 || '',
+    amplicon: '',
+    guide: '',
+    hdr_seq: '',
+    coding: false
+  }));
+
+  renderFileList(pairs, unmatched);
+  renderSampleTable();
+
+  const hasValidPairs = samples.some(s => s.r1 && s.r2);
+  document.getElementById('step1-next').disabled = !hasValidPairs;
+}
+
+function renderFileList(pairs, unmatched) {
+  const wrap = document.getElementById('file-list-wrap');
+  const list = document.getElementById('file-list');
+  const statsBar = document.getElementById('stats-bar');
+  wrap.style.display = 'block';
+
+  const totalPairs = Object.values(pairs).filter(p => p.r1 && p.r2).length;
+  const orphaned = Object.values(pairs).filter(p => !p.r1 || !p.r2).length + unmatched.length;
+
+  statsBar.innerHTML = `
+    <div class="stat"><div class="stat-val">${Object.keys(pairs).length}</div><div class="stat-label">Samples detected</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--accent2)">${totalPairs}</div><div class="stat-label">Complete pairs</div></div>
+    <div class="stat"><div class="stat-val" style="color:${orphaned>0?'var(--error)':'var(--muted)'}">${orphaned}</div><div class="stat-label">Unpaired / unknown</div></div>
+  `;
+
+  list.innerHTML = '';
+  Object.entries(pairs).forEach(([key, val]) => {
+    const paired = val.r1 && val.r2;
+    list.innerHTML += `
+      <div class="file-item">
+        <span class="file-badge ${paired ? 'badge-r1' : 'badge-unpaired'}">${paired ? 'PAIR' : 'R1 ONLY'}</span>
+        <span style="color:var(--text);flex:1">${key}</span>
+        <span style="color:var(--muted);font-size:11px">${val.r1 || '—'}</span>
+        <span style="color:var(--muted)">↔</span>
+        <span style="color:var(--muted);font-size:11px">${val.r2 || '<span style="color:var(--error)">missing R2</span>'}</span>
+      </div>`;
+  });
+
+  unmatched.forEach(f => {
+    list.innerHTML += `
+      <div class="file-item">
+        <span class="file-badge badge-unpaired">UNKNOWN</span>
+        <span style="color:var(--muted);flex:1">${f.name}</span>
+        <span style="color:var(--muted);font-size:11px">Could not detect R1/R2 — will be skipped</span>
+      </div>`;
+  });
+}
+
+function clearFiles() {
+  samples = [];
+  document.getElementById('file-list-wrap').style.display = 'none';
+  document.getElementById('step1-next').disabled = true;
+  document.getElementById('fastq-input').value = '';
+  renderSampleTable();
+}
+
+// Drag and drop
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ─── Sample table ─────────────────────────────────────────────────────────────
+function renderSampleTable() {
+  const wrap = document.getElementById('sample-table-wrap');
+  if (!samples.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="big">🔬</div>No samples loaded yet — go back to Step 1</div>';
+    return;
+  }
+
+  let html = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>#</th>
+      <th>Sample name</th>
+      <th>R1 file</th>
+      <th>R2 file</th>
+      <th>Amplicon sequence <span style="color:var(--error)">*</span></th>
+      <th>Guide RNA (spacer) <span style="color:var(--error)">*</span></th>
+      <th>HDR template <span style="color:var(--muted)">(opt)</span></th>
+    </tr></thead><tbody>`;
+
+  samples.forEach((s, i) => {
+    html += `<tr>
+      <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
+      <td class="sample-name-cell">${s.name}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
+      <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
+        oninput="samples[${i}].amplicon=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].amplicon"
+        style="border-color:${s.amplicon?'transparent':'rgba(248,81,73,0.4)'}"></td>
+      <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.guide}"
+        oninput="samples[${i}].guide=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].guide"
+        style="border-color:${s.guide?'transparent':'rgba(248,81,73,0.4)'}"></td>
+      <td class="seq-cell"><input type="text" placeholder="optional" value="${s.hdr_seq||''}"
+        oninput="samples[${i}].hdr_seq=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].hdr_seq"></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  wrap.innerHTML = html;
+}
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+function runValidation() {
+  const list = document.getElementById('validation-list');
+  const checks = [];
+  let errors = 0;
+
+  // Check 1: samples exist
+  if (!samples.length) {
+    checks.push({ type: 'err', msg: 'No samples loaded. Go back to Step 1.' });
+    errors++;
+  } else {
+    checks.push({ type: 'ok', msg: `${samples.length} sample(s) loaded.` });
+  }
+
+  // Check 2: all pairs complete
+  const missingR2 = samples.filter(s => !s.r2);
+  if (missingR2.length) {
+    checks.push({ type: 'err', msg: `${missingR2.length} sample(s) missing R2 file: ${missingR2.map(s=>s.name).join(', ')}` });
+    errors++;
+  } else if (samples.length) {
+    checks.push({ type: 'ok', msg: 'All samples have R1 + R2 pairs.' });
+  }
+
+  // Check 3: amplicon sequences
+  const missingAmp = samples.filter(s => !s.amplicon);
+  if (missingAmp.length) {
+    checks.push({ type: 'err', msg: `${missingAmp.length} sample(s) missing amplicon sequence: ${missingAmp.map(s=>s.name).join(', ')}` });
+    errors++;
+  } else if (samples.length) {
+    checks.push({ type: 'ok', msg: 'All samples have amplicon sequences.' });
+  }
+
+  // Check 4: guide sequences
+  const missingGuide = samples.filter(s => !s.guide);
+  if (missingGuide.length) {
+    checks.push({ type: 'warn', msg: `${missingGuide.length} sample(s) missing guide RNA: ${missingGuide.map(s=>s.name).join(', ')}. CRISPResso will run without guide-based quantification.` });
+  } else if (samples.length) {
+    checks.push({ type: 'ok', msg: 'All samples have guide RNA sequences.' });
+  }
+
+  // Check 5: guide within amplicon
+  if (samples.length) {
+    const guideNotInAmp = samples.filter(s => s.guide && s.amplicon && !s.amplicon.includes(s.guide) && !revComp(s.amplicon).includes(s.guide));
+    if (guideNotInAmp.length) {
+      checks.push({ type: 'err', msg: `Guide not found in amplicon (fwd or rev) for: ${guideNotInAmp.map(s=>s.name).join(', ')}. Check sequences.` });
+      errors++;
+    } else if (samples.filter(s=>s.guide && s.amplicon).length) {
+      checks.push({ type: 'ok', msg: 'All guide sequences found within amplicon (fwd or rev complement).' });
+    }
+  }
+
+  // Check 6: sequence length sanity
+  const shortAmp = samples.filter(s => s.amplicon && s.amplicon.length < 50);
+  if (shortAmp.length) {
+    checks.push({ type: 'warn', msg: `${shortAmp.length} amplicon(s) seem very short (<50bp): ${shortAmp.map(s=>s.name).join(', ')}` });
+  }
+
+  const shortGuide = samples.filter(s => s.guide && (s.guide.length < 17 || s.guide.length > 23));
+  if (shortGuide.length) {
+    checks.push({ type: 'warn', msg: `${shortGuide.length} guide(s) have unusual length (expected 17-23bp): ${shortGuide.map(s=>s.name).join(', ')}` });
+  }
+
+  // Check 7: duplicate sample names
+  const names = samples.map(s => s.name);
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dupes.length) {
+    checks.push({ type: 'err', msg: `Duplicate sample names: ${[...new Set(dupes)].join(', ')}` });
+    errors++;
+  }
+
+  // Check 8: output folder
+  const outName = document.getElementById('param-output').value.trim();
+  if (!outName) {
+    checks.push({ type: 'warn', msg: 'No output folder name set — will use CRISPRessoWGS default.' });
+  }
+
+  list.innerHTML = checks.map(c => `
+    <div class="val-item val-${c.type}">
+      <span class="val-icon">${c.type==='ok'?'✅':c.type==='warn'?'⚠️':'❌'}</span>
+      <span>${c.msg}</span>
+    </div>`).join('');
+
+  validationPassed = errors === 0;
+  document.getElementById('validate-next').disabled = !validationPassed;
+}
+
+function revComp(seq) {
+  return seq.split('').reverse().map(b => ({A:'T',T:'A',C:'G',G:'C',N:'N'}[b]||b)).join('');
+}
+
+// ─── Build export ─────────────────────────────────────────────────────────────
+function buildExport() {
+  // Header row
+  const cols = ['name', 'fastq_r1', 'fastq_r2', 'amplicon_seq', 'guide_seq'];
+  const hasHDR = samples.some(s => s.hdr_seq);
+  if (hasHDR) cols.push('expected_hdr_amplicon_seq');
+
+  const rows = [cols.join('\t')];
+  samples.forEach(s => {
+    const row = [s.name, s.r1, s.r2, s.amplicon, s.guide];
+    if (hasHDR) row.push(s.hdr_seq || '');
+    rows.push(row.join('\t'));
+  });
+
+  const batchContent = rows.join('\n');
+  document.getElementById('batch-preview').textContent = batchContent;
+
+  const batchName = (document.getElementById('param-name').value.trim() || 'batch') + '.batch';
+  const outputDir = document.getElementById('param-output').value.trim() || 'CRISPRessoBatch_output';
+  const qw = document.getElementById('param-qw').value.trim() || '1';
+  const minfreq = document.getElementById('param-minfreq').value.trim() || '0.2';
+  const minreads = document.getElementById('param-minreads').value.trim() || '1000';
+  const minoverlap = document.getElementById('param-minoverlap').value.trim();
+  const maxoverlap = document.getElementById('param-maxoverlap').value.trim();
+  const strict = document.getElementById('param-strict').value;
+  const extra = document.getElementById('param-extra').value.trim();
+
+  let cmd = `CRISPRessoWGS --batch_settings ${batchName}`;
+  cmd += ` --output_folder ${outputDir}`;
+  cmd += ` --quantification_window_size ${qw}`;
+  cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
+  cmd += ` --min_reads_to_use_region ${minreads}`;
+  if (minoverlap) cmd += ` --min_paired_end_reads_overlap ${minoverlap}`;
+  if (maxoverlap) cmd += ` --max_paired_end_reads_overlap ${maxoverlap}`;
+  if (strict === '1') cmd += ` --stringent_flash_merging`;
+  if (extra) cmd += ` ${extra}`;
+
+  document.getElementById('run-cmd').textContent = cmd;
+}
+
+function downloadBatch() {
+  const batchName = (document.getElementById('param-name').value.trim() || 'batch') + '.batch';
+  const content = document.getElementById('batch-preview').textContent;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = batchName;
+  a.click();
+}
+
+function copyCmd() {
+  const cmd = document.getElementById('run-cmd').textContent;
+  navigator.clipboard.writeText(cmd);
+  const confirm = document.getElementById('copy-confirm');
+  confirm.style.display = 'block';
+  setTimeout(() => confirm.style.display = 'none', 2000);
+}
+</script>
+</body>
+</html>
