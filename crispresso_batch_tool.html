@@ -590,41 +590,13 @@
         <div class="helper-text">default: 0.2</div>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label data-tip="Minimum reads to be considered for analysis">Min reads per sample</label>
-        <input type="text" id="param-minreads" value="1000" placeholder="1000">
-        <div class="helper-text">default: 1000</div>
-      </div>
-      <div class="form-group">
-        <label>Stringent filter</label>
-        <select id="param-strict">
-          <option value="0">Off (default)</option>
-          <option value="1">On</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Paired-end Merging</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label data-tip="Minimum overlap for FLASH merging">Min overlap (FLASH)</label>
-        <input type="text" id="param-minoverlap" value="10" placeholder="10">
-      </div>
-      <div class="form-group">
-        <label data-tip="Maximum overlap for FLASH merging">Max overlap (FLASH)</label>
-        <input type="text" id="param-maxoverlap" value="100" placeholder="100">
-      </div>
-    </div>
   </div>
 
   <div class="card">
     <div class="card-title">Additional flags <span style="color:var(--muted);font-weight:400;font-size:11px">(optional)</span></div>
     <label>Extra command-line flags to append</label>
     <input type="text" id="param-extra" placeholder="e.g. --keep_intermediate --max_paired_end_reads_overlap 100">
-    <div class="helper-text">These will be appended verbatim to the CRISPRessoWGS command</div>
+    <div class="helper-text">These will be appended verbatim to the CRISPRessoBatch command</div>
   </div>
 
   <div class="btn-row">
@@ -972,24 +944,18 @@ function buildExport() {
   const batchContent = rows.join('\n');
   document.getElementById('batch-preview').textContent = batchContent;
 
-  const batchName = (document.getElementById('param-name').value.trim() || 'batch') + '.batch';
-  const outputDir = document.getElementById('param-output').value.trim() || 'CRISPRessoBatch_output';
-  const qw = document.getElementById('param-qw').value.trim() || '1';
-  const minfreq = document.getElementById('param-minfreq').value.trim() || '0.2';
-  const minreads = document.getElementById('param-minreads').value.trim() || '1000';
-  const minoverlap = document.getElementById('param-minoverlap').value.trim();
-  const maxoverlap = document.getElementById('param-maxoverlap').value.trim();
-  const strict = document.getElementById('param-strict').value;
+  const batchNameVal = document.getElementById('param-name').value.trim();
+  const batchName = (batchNameVal || 'batch') + '.batch';
+  const outputDir = document.getElementById('param-output').value.trim();
+  const qw = document.getElementById('param-qw').value.trim();
+  const minfreq = document.getElementById('param-minfreq').value.trim();
   const extra = document.getElementById('param-extra').value.trim();
 
   let cmd = `CRISPRessoBatch --batch_settings ${batchName}`;
-  cmd += ` --output_folder ${outputDir}`;
-  cmd += ` --quantification_window_size ${qw}`;
-  cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
-  cmd += ` --min_reads_to_use_region ${minreads}`;
-  if (minoverlap) cmd += ` --min_paired_end_reads_overlap ${minoverlap}`;
-  if (maxoverlap) cmd += ` --max_paired_end_reads_overlap ${maxoverlap}`;
-  if (strict === '1') cmd += ` --stringent_flash_merging`;
+  if (outputDir && outputDir !== 'CRISPRessoBatch_output') cmd += ` --output_folder ${outputDir}`;
+  if (qw && qw !== '1') cmd += ` --quantification_window_size ${qw}`;
+  if (minfreq && minfreq !== '0.2') cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
+  if (batchNameVal && batchNameVal !== 'batch') cmd += ` --name ${batchNameVal}`;
   if (extra) cmd += ` ${extra}`;
 
   document.getElementById('run-cmd').textContent = cmd;
