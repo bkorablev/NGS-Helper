@@ -295,6 +295,14 @@
     min-width: 160px;
   }
 
+  .label-cell { min-width: 180px; }
+  .label-cell input {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 180px;
+  }
+
   .seq-cell input { min-width: 200px; font-size: 11px; }
 
   /* Validation */
@@ -809,10 +817,11 @@ function renderSampleTable() {
   samples.forEach((s, i) => {
     html += `<tr>
       <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
-      <td class="seq-cell"><input type="text" value="${s.label}"
+      <td class="label-cell"><input type="text" value="${s.label}" placeholder="Custom label"
         oninput="samples[${i}].label=this.value"
         style="border-color:${s.label?'transparent':'rgba(248,81,73,0.4)'}"></td>
-      <td class="sample-name-cell">${s.name}</td>
+      <td class="sample-name-cell"><input type="text" value="${s.name}"
+        oninput="samples[${i}].name=this.value"></td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
       <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
@@ -938,7 +947,7 @@ function buildExport() {
 
   const rows = [cols.join('\t')];
   samples.forEach(s => {
-    const row = [s.label, s.r1, s.r2, s.amplicon, s.guide];
+    const row = [s.name, s.r1, s.r2, s.amplicon, s.guide];
     if (hasHDR) row.push(s.hdr_seq || '');
     rows.push(row.join('\t'));
   });
