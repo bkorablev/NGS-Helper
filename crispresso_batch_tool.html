@@ -305,6 +305,32 @@
 
   .seq-cell input { min-width: 200px; font-size: 11px; }
 
+  .fill-wrap { position: relative; display: flex; align-items: center; }
+
+  .fill-btn {
+    position: absolute;
+    right: 2px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 1px 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    border-radius: 3px;
+    line-height: 1;
+  }
+
+  td:hover .fill-btn { opacity: 1; }
+  .fill-btn:hover { background: rgba(63,185,80,0.2); color: var(--accent2); }
+
+  @keyframes fillFlash {
+    0%   { background: rgba(63,185,80,0.25); }
+    100% { background: transparent; }
+  }
+  .fill-flash { animation: fillFlash 0.6s ease-out; }
+
   /* Validation */
   .validation-list {
     display: flex;
@@ -774,6 +800,28 @@ function handleEnterKey(e, row, col) {
   if (next) next.focus();
 }
 
+function fillDown(row, col) {
+  const src = document.querySelector(`input[data-row="${row}"][data-col="${col}"]`);
+  let value = src.value;
+  const isSeq = col === 'amplicon' || col === 'guide' || col === 'hdr';
+  if (isSeq) value = value.toUpperCase().replace(/[^ATCGN]/gi, '');
+
+  for (let j = row + 1; j < samples.length; j++) {
+    if      (col === 'amplicon') samples[j].amplicon = value;
+    else if (col === 'guide')    samples[j].guide    = value;
+    else if (col === 'hdr')      samples[j].hdr_seq  = value;
+    else if (col === 'name')     samples[j].name     = value;
+    else if (col === 'label')    samples[j].label    = value;
+
+    const target = document.querySelector(`input[data-row="${j}"][data-col="${col}"]`);
+    if (target) {
+      target.value = value;
+      target.classList.add('fill-flash');
+      setTimeout(() => target.classList.remove('fill-flash'), 600);
+    }
+  }
+}
+
 function renderSampleTable() {
   const wrap = document.getElementById('sample-table-wrap');
   if (!samples.length) {
@@ -794,33 +842,35 @@ function renderSampleTable() {
     </tr></thead><tbody>`;
 
   samples.forEach((s, i) => {
+    const notLast = i < samples.length - 1;
+    const fb = col => notLast ? `<button class="fill-btn" onclick="fillDown(${i},'${col}')" title="Fill down">↓</button>` : '';
     html += `<tr>
       <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
-      <td class="label-cell"><input type="text" value="${s.label}" placeholder="Custom label"
+      <td class="label-cell"><div class="fill-wrap"><input type="text" value="${s.label}" placeholder="Custom label"
         data-row="${i}" data-col="label"
         oninput="samples[${i}].label=this.value"
         onkeydown="handleEnterKey(event,${i},'label')"
-        style="border-color:${s.label?'transparent':'rgba(248,81,73,0.4)'}"></td>
-      <td class="sample-name-cell"><input type="text" value="${s.name}"
+        style="border-color:${s.label?'transparent':'rgba(248,81,73,0.4)'}">${fb('label')}</div></td>
+      <td class="sample-name-cell"><div class="fill-wrap"><input type="text" value="${s.name}"
         data-row="${i}" data-col="name"
         oninput="samples[${i}].name=this.value"
-        onkeydown="handleEnterKey(event,${i},'name')"></td>
+        onkeydown="handleEnterKey(event,${i},'name')">${fb('name')}</div></td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
-      <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
+      <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
         data-row="${i}" data-col="amplicon"
         oninput="samples[${i}].amplicon=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].amplicon"
         onkeydown="handleEnterKey(event,${i},'amplicon')"
-        style="border-color:${s.amplicon?'transparent':'rgba(248,81,73,0.4)'}"></td>
-      <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.guide}"
+        style="border-color:${s.amplicon?'transparent':'rgba(248,81,73,0.4)'}">${fb('amplicon')}</div></td>
+      <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="ATCG…" value="${s.guide}"
         data-row="${i}" data-col="guide"
         oninput="samples[${i}].guide=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].guide"
         onkeydown="handleEnterKey(event,${i},'guide')"
-        style="border-color:${s.guide?'transparent':'rgba(248,81,73,0.4)'}"></td>
-      <td class="seq-cell"><input type="text" placeholder="optional" value="${s.hdr_seq||''}"
+        style="border-color:${s.guide?'transparent':'rgba(248,81,73,0.4)'}">${fb('guide')}</div></td>
+      <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="optional" value="${s.hdr_seq||''}"
         data-row="${i}" data-col="hdr"
         oninput="samples[${i}].hdr_seq=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].hdr_seq"
-        onkeydown="handleEnterKey(event,${i},'hdr')"></td>
+        onkeydown="handleEnterKey(event,${i},'hdr')">${fb('hdr')}</div></td>
     </tr>`;
   });
 
