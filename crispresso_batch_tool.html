@@ -795,6 +795,13 @@ dz.addEventListener('drop', e => {
 });
 
 // ─── Sample table ─────────────────────────────────────────────────────────────
+function handleEnterKey(e, row, col) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const next = document.querySelector(`input[data-row="${row + 1}"][data-col="${col}"]`);
+  if (next) next.focus();
+}
+
 function renderSampleTable() {
   const wrap = document.getElementById('sample-table-wrap');
   if (!samples.length) {
@@ -818,20 +825,30 @@ function renderSampleTable() {
     html += `<tr>
       <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
       <td class="label-cell"><input type="text" value="${s.label}" placeholder="Custom label"
+        data-row="${i}" data-col="label"
         oninput="samples[${i}].label=this.value"
+        onkeydown="handleEnterKey(event,${i},'label')"
         style="border-color:${s.label?'transparent':'rgba(248,81,73,0.4)'}"></td>
       <td class="sample-name-cell"><input type="text" value="${s.name}"
-        oninput="samples[${i}].name=this.value"></td>
+        data-row="${i}" data-col="name"
+        oninput="samples[${i}].name=this.value"
+        onkeydown="handleEnterKey(event,${i},'name')"></td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
       <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
+        data-row="${i}" data-col="amplicon"
         oninput="samples[${i}].amplicon=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].amplicon"
+        onkeydown="handleEnterKey(event,${i},'amplicon')"
         style="border-color:${s.amplicon?'transparent':'rgba(248,81,73,0.4)'}"></td>
       <td class="seq-cell"><input type="text" placeholder="ATCG…" value="${s.guide}"
+        data-row="${i}" data-col="guide"
         oninput="samples[${i}].guide=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].guide"
+        onkeydown="handleEnterKey(event,${i},'guide')"
         style="border-color:${s.guide?'transparent':'rgba(248,81,73,0.4)'}"></td>
       <td class="seq-cell"><input type="text" placeholder="optional" value="${s.hdr_seq||''}"
-        oninput="samples[${i}].hdr_seq=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].hdr_seq"></td>
+        data-row="${i}" data-col="hdr"
+        oninput="samples[${i}].hdr_seq=this.value.toUpperCase().replace(/[^ATCGN]/gi,'');this.value=samples[${i}].hdr_seq"
+        onkeydown="handleEnterKey(event,${i},'hdr')"></td>
     </tr>`;
   });
 
