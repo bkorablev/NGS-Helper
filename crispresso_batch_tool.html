@@ -706,7 +706,33 @@
     </div>
   </div>
 
+  <div class="card" id="ko-settings-card">
+    <div class="card-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none" onclick="toggleKOSettings()">
+      <span>KO Classification Settings</span>
+      <span id="ko-settings-arrow" style="font-size:11px;color:var(--muted);font-family:var(--mono)">▼</span>
+    </div>
+    <div id="ko-settings-body" style="margin-top:8px">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Number of alleles (ploidy)</label>
+          <input type="number" id="ko-ploidy" value="2" min="1" max="20" style="width:80px" oninput="reEvalKO()">
+          <div class="helper-text">e.g. 2 for diploid (RPE), 3 for triploid (K562)</div>
+        </div>
+        <div class="form-group">
+          <label>Min % modified reads to count an allele as KO'd</label>
+          <input type="number" id="ko-threshold" value="80" min="0" max="100" style="width:80px" oninput="reEvalKO()">
+        </div>
+        <div class="form-group">
+          <label>Large deletion threshold (bp)</label>
+          <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
+          <div class="helper-text">Deletions ≥ this size may span an intron</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="results-content" style="display:none">
+    <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
     <div class="card">
       <div class="card-title">Summary</div>
       <div class="table-wrap" id="results-table-wrap"></div>
@@ -1153,12 +1179,16 @@ function loadResults(files) {
     if (subIdx === -1) return;
     const sub = parts[subIdx];
     const fname = parts[parts.length - 1];
-    const isQuant = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
-    const isMap   = fname === 'CRISPResso_mapping_statistics.txt';
-    if (!isQuant && !isMap) return;
+    const isQuant   = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
+    const isMap     = fname === 'CRISPResso_mapping_statistics.txt';
+    const isRefHist = fname === 'Reference.Deletion_histogram.txt';
+    const isDelHist = fname === 'Deletion_histogram.txt';
+    if (!isQuant && !isMap && !isRefHist && !isDelHist) return;
     if (!groups[sub]) groups[sub] = {};
-    if (isQuant) groups[sub].quantFile = f;
-    else         groups[sub].mapFile   = f;
+    if (isQuant)        groups[sub].quantFile   = f;
+    else if (isMap)     groups[sub].mapFile     = f;
+    else if (isRefHist) groups[sub].delHistFile = f;           // preferred
+    else if (!groups[sub].delHistFile) groups[sub].delHistFile = f; // fallback
   });
 
   const subfolders = Object.keys(groups).sort();
@@ -1177,6 +1207,7 @@ function loadResults(files) {
     renderResultsTable();
     renderResultsCharts();
     renderParseErrors();
+    renderKOSummaryBar();
     document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
   });
 }
@@ -1216,7 +1247,10 @@ async function parseSample(subfolder, files) {
     ambiguous: 0,
     // Calculated percentages (denominator = alignedAllAmplicons)
     refUnmodifiedPct: 0, nhejPct: 0, hdrPct: 0, ambiguousPct: 0,
-    alignedPct: 0
+    alignedPct: 0,
+    // Deletion histogram
+    hasDelHist: false, delFsReads: 0, delInFrameReads: 0,
+    delTotalReads: 0, delFsPct: 0, largeDels: []
   };
 
   // FILE 2: mapping statistics
@@ -1282,6 +1316,34 @@ async function parseSample(subfolder, files) {
     result.failed = true;
   }
 
+  // FILE 3: deletion histogram (Reference.Deletion_histogram.txt preferred, else Deletion_histogram.txt)
+  if (files.delHistFile) {
+    try {
+      const text = await readFileText(files.delHistFile);
+      const rows = parseTSV(text);
+      let fsReads = 0, inFrameReads = 0, totalDelReads = 0;
+      const largeDels = [];
+      rows.forEach(row => {
+        const delSize = parseInt(row['del_size']) || 0;
+        const fq      = parseInt(row['fq'])       || 0;
+        if (delSize === 0) return;
+        const absSize = Math.abs(delSize);
+        totalDelReads += fq;
+        if (absSize % 3 !== 0) fsReads      += fq;
+        else                   inFrameReads += fq;
+        largeDels.push({ size: absSize, fq });
+      });
+      result.hasDelHist      = true;
+      result.delFsReads      = fsReads;
+      result.delInFrameReads = inFrameReads;
+      result.delTotalReads   = totalDelReads;
+      result.delFsPct        = totalDelReads > 0 ? (fsReads / totalDelReads) * 100 : 0;
+      result.largeDels       = largeDels;
+    } catch (e) {
+      parseErrors.push(`${name}: failed to read deletion histogram — ${e.message}`);
+    }
+  }
+
   return result;
 }
 
@@ -1290,7 +1352,7 @@ function pct(n, total) { return total ? ((n / total) * 100).toFixed(1) : '0.0'; 
 function renderResultsTable() {
   const anyHDR = resultsData.some(r => r.hasHDR);
   const anyAmbiguous = anyHDR && resultsData.some(r => r.ambiguous > 0);
-  const NCOLS = 5 + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
+  const NCOLS = 6 + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
 
   let html = `<table><thead><tr>
     <th>Sample</th>
@@ -1301,6 +1363,7 @@ function renderResultsTable() {
     <th>NHEJ</th>
     ${anyHDR ? '<th>HDR</th>' : ''}
     ${anyAmbiguous ? '<th>Ambiguous</th>' : ''}
+    <th>KO Status</th>
   </tr></thead><tbody>`;
 
   resultsData.forEach(r => {
@@ -1312,6 +1375,11 @@ function renderResultsTable() {
       return;
     }
     const nhejColor = r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)';
+    const { status: koStatus, warnings: koWarnings } = classifyKO(r);
+    const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
+    const koWarn  = koWarnings.length
+      ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
+      : '';
     html += `<tr>
       <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
       <td style="font-family:var(--mono)">${r.readsInInputs.toLocaleString()}</td>
@@ -1321,6 +1389,7 @@ function renderResultsTable() {
       <td style="font-family:var(--mono);color:${nhejColor}">${r.nhej.toLocaleString()} <span>(${r.nhejPct.toFixed(1)}%)</span></td>
       ${anyHDR ? `<td style="font-family:var(--mono);color:var(--accent2)">${r.hasHDR ? r.totalHDR.toLocaleString() + ' <span>(' + r.hdrPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
       ${anyAmbiguous ? `<td style="font-family:var(--mono);color:var(--muted)">${r.ambiguous > 0 ? r.ambiguous.toLocaleString() + ' <span>(' + r.ambiguousPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
+      <td style="min-width:140px">${koBadge}${koWarn}</td>
     </tr>`;
   });
 
@@ -1366,6 +1435,94 @@ function renderParseErrors() {
   el.style.display = 'block';
 }
 
+function classifyKO(r) {
+  if (r.failed) return { status: null, warnings: [] };
+  if (!r.hasDelHist) return { status: 'Insufficient data', warnings: [] };
+
+  const ploidy    = Math.max(1, parseInt(document.getElementById('ko-ploidy').value)    || 2);
+  const threshold = parseFloat(document.getElementById('ko-threshold').value) || 80;
+  const largeDel  = Math.max(1, parseInt(document.getElementById('ko-large-del').value) || 50);
+
+  const modifiedPct     = r.nhejPct + (r.hasHDR ? r.hdrPct : 0);
+  const fullKOThresh    = threshold * (ploidy - 1) / ploidy;
+  const partialKOThresh = threshold / ploidy;
+
+  let status;
+  if      (modifiedPct >= fullKOThresh)    status = 'Full KO';
+  else if (modifiedPct >= partialKOThresh) status = 'Partial KO';
+  else                                     status = 'No KO';
+
+  const warnings = [];
+  if (status === 'Full KO' || status === 'Partial KO') {
+    if (r.delFsPct < 50) {
+      warnings.push('⚠ Deletions may be in-frame — verify KO');
+    }
+    r.largeDels.forEach(d => {
+      if (d.size >= largeDel && r.delTotalReads > 0 && (d.fq / r.delTotalReads) > 0.1) {
+        warnings.push(`ℹ Large deletion (${d.size}bp) detected — may span intron`);
+      }
+    });
+  }
+
+  return { status, warnings };
+}
+
+function koStatusBadge(status) {
+  const colorMap = {
+    'Full KO':           '#3fb950',
+    'Partial KO':        '#d29922',
+    'No KO':             '#7d8590',
+    'Insufficient data': '#7d8590'
+  };
+  const c = colorMap[status] || '#7d8590';
+  return `<span style="background:${c}22;color:${c};border:1px solid ${c}55;border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono);white-space:nowrap">${status}</span>`;
+}
+
+function renderKOSummaryBar() {
+  const bar  = document.getElementById('ko-summary-bar');
+  const good = resultsData.filter(r => !r.failed);
+  if (!good.length) { bar.style.display = 'none'; return; }
+
+  let fullKO = 0, partialKO = 0, noKO = 0, insufficient = 0;
+  good.forEach(r => {
+    const { status } = classifyKO(r);
+    if      (status === 'Full KO')           fullKO++;
+    else if (status === 'Partial KO')        partialKO++;
+    else if (status === 'No KO')             noKO++;
+    else                                     insufficient++;
+  });
+
+  let html = `
+    <span style="color:#3fb950"><strong>${fullKO}</strong> Full KO</span>
+    <span style="color:var(--border)">|</span>
+    <span style="color:#d29922"><strong>${partialKO}</strong> Partial KO</span>
+    <span style="color:var(--border)">|</span>
+    <span style="color:#7d8590"><strong>${noKO}</strong> No KO</span>`;
+  if (insufficient > 0) html += `
+    <span style="color:var(--border)">|</span>
+    <span style="color:var(--muted)"><strong>${insufficient}</strong> Insufficient data</span>`;
+  html += `
+    <span style="color:var(--border)">|</span>
+    <span style="color:var(--muted)">${good.length} samples total</span>`;
+
+  bar.style.display = 'flex';
+  bar.innerHTML = html;
+}
+
+function toggleKOSettings() {
+  const body  = document.getElementById('ko-settings-body');
+  const arrow = document.getElementById('ko-settings-arrow');
+  const open  = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  arrow.textContent  = open ? '▶' : '▼';
+}
+
+function reEvalKO() {
+  if (!resultsData.length) return;
+  renderResultsTable();
+  renderKOSummaryBar();
+}
+
 function exportResults() {
   const wb = XLSX.utils.book_new();
   const anyHDR = resultsData.some(r => r.hasHDR);
@@ -1374,12 +1531,18 @@ function exportResults() {
   const summaryHeaders = ['Sample', 'Reads in Input', 'Reads Aligned', 'Aligned %',
     'Unmodified', 'Unmodified %', 'NHEJ', 'NHEJ %',
     ...(anyHDR ? ['HDR (Perfect+Imperfect)', 'HDR %', 'Ambiguous', 'Ambiguous %'] : []),
-    'Status'];
+    'Status', 'KO Status', 'KO Warnings'];
   const summaryRows = [summaryHeaders, ...resultsData.map(r => {
     const row = [r.name, r.readsInInputs, r.alignedAllAmplicons, r.alignedPct,
                  r.refUnmodified, r.refUnmodifiedPct, r.nhej, r.nhejPct];
     if (anyHDR) row.push(r.totalHDR, r.hdrPct, r.ambiguous, r.ambiguousPct);
     row.push(r.failed ? 'Failed' : 'OK');
+    if (!r.failed) {
+      const { status, warnings } = classifyKO(r);
+      row.push(status || '—', warnings.join('; '));
+    } else {
+      row.push('', '');
+    }
     return row;
   })];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
