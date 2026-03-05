@@ -348,6 +348,33 @@
   }
   .fill-flash { animation: fillFlash 0.6s ease-out; }
 
+  /* Loading spinner */
+  #results-loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 0;
+    gap: 16px;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+  }
+  #results-loading.fade-out { opacity: 0; }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #results-loading-msg {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
   /* Validation */
   .validation-list {
     display: flex;
@@ -726,6 +753,11 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <div id="results-loading">
+    <div class="spinner"></div>
+    <div id="results-loading-msg">Reading files…</div>
   </div>
 
   <div id="results-content" style="display:none">
@@ -1159,6 +1191,25 @@ function copyCmd() {
 let resultsData = [];
 const parseErrors = [];
 
+function setLoadingMsg(msg) {
+  document.getElementById('results-loading-msg').textContent = msg;
+}
+
+function showSpinner() {
+  const el = document.getElementById('results-loading');
+  el.classList.remove('fade-out');
+  el.style.display = 'flex';
+  document.getElementById('results-content').style.display = 'none';
+  document.getElementById('results-empty').style.display  = 'none';
+  document.getElementById('results-errors').style.display = 'none';
+}
+
+function hideSpinner() {
+  const el = document.getElementById('results-loading');
+  el.classList.add('fade-out');
+  setTimeout(() => { el.style.display = 'none'; el.classList.remove('fade-out'); }, 320);
+}
+
 function loadResults(files) {
   const fileArr = Array.from(files);
   parseErrors.length = 0;
@@ -1167,6 +1218,9 @@ function loadResults(files) {
     const topFolder = fileArr[0].webkitRelativePath.split('/')[0];
     document.getElementById('results-folder-label').textContent = topFolder;
   }
+
+  showSpinner();
+  setLoadingMsg('Reading files…');
 
   // Group files by CRISPResso_on_<sample> subfolder.
   // Use the full path up to (and including) that folder as the key so that
@@ -1198,21 +1252,34 @@ function loadResults(files) {
   const subfolders = Object.keys(groups).sort();
 
   if (!subfolders.length) {
-    document.getElementById('results-content').style.display = 'none';
+    hideSpinner();
     document.getElementById('results-empty').style.display = 'block';
-    document.getElementById('results-errors').style.display = 'none';
     return;
   }
 
-  document.getElementById('results-empty').style.display = 'none';
+  let parsed = 0;
+  const total = subfolders.length;
+  setLoadingMsg(`Parsing sample 1 of ${total}…`);
 
-  Promise.all(subfolders.map(key => parseSample(groups[key].subName, groups[key]))).then(results => {
+  Promise.all(subfolders.map(key => {
+    const hasZip = groups[key].allelesFile && groups[key].allelesFile.name.endsWith('.zip');
+    if (hasZip) setLoadingMsg(`Unzipping allele table for sample ${parsed + 1} of ${total}…`);
+    return parseSample(groups[key].subName, groups[key]).then(r => {
+      parsed++;
+      if (parsed < total) setLoadingMsg(`Parsing sample ${parsed + 1} of ${total}…`);
+      else                setLoadingMsg('Building summary…');
+      return r;
+    });
+  })).then(results => {
     resultsData = results.filter(Boolean);
     renderResultsTable();
     renderResultsCharts();
     renderParseErrors();
     renderKOSummaryBar();
+    hideSpinner();
     document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
+  }).catch(() => {
+    hideSpinner();
   });
 }
 
