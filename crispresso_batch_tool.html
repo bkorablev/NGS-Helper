@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRISPResso2 Batch Prep</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
@@ -1167,28 +1168,31 @@ function loadResults(files) {
     document.getElementById('results-folder-label').textContent = topFolder;
   }
 
-  // Group files by direct CRISPResso_on_<sample> subfolder
+  // Group files by CRISPResso_on_<sample> subfolder.
+  // Use the full path up to (and including) that folder as the key so that
+  // samples with identical folder names under different parents stay separate.
   const groups = {};
   fileArr.forEach(f => {
-    const parts = f.webkitRelativePath.split('/');
-    const subIdx = parts.findIndex(p => /^CRISPResso_on_/i.test(p));
+    const parts   = f.webkitRelativePath.split('/');
+    const subIdx  = parts.findIndex(p => /^CRISPResso_on_/i.test(p));
     if (subIdx === -1) return;
-    const sub = parts[subIdx];
-    const fname = parts[parts.length - 1];
+    const subKey  = parts.slice(0, subIdx + 1).join('/'); // unique per-sample path key
+    const subName = parts[subIdx];                        // CRISPResso_on_<sample> folder name
+    const fname   = parts[parts.length - 1];
     const isQuant      = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
     const isMap        = fname === 'CRISPResso_mapping_statistics.txt';
     const isRefHist    = fname === 'Reference.Deletion_histogram.txt';
     const isDelHist    = fname === 'Deletion_histogram.txt';
     const isRefAlleles = fname.startsWith('Reference.Alleles_frequency_table');
-    const isAlleles    = fname === 'Alleles_frequency_table.txt';
+    const isAlleles    = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
     if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefAlleles && !isAlleles) return;
-    if (!groups[sub]) groups[sub] = {};
-    if (isQuant)           groups[sub].quantFile   = f;
-    else if (isMap)        groups[sub].mapFile     = f;
-    else if (isRefHist)    groups[sub].delHistFile = f;
-    else if (isDelHist && !groups[sub].delHistFile) groups[sub].delHistFile = f;
-    else if (isRefAlleles) groups[sub].allelesFile = f;           // preferred
-    else if (isAlleles && !groups[sub].allelesFile) groups[sub].allelesFile = f; // fallback
+    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null };
+    if (isQuant)           groups[subKey].quantFile   = f;
+    else if (isMap)        groups[subKey].mapFile     = f;
+    else if (isRefHist)    groups[subKey].delHistFile = f;
+    else if (isDelHist && !groups[subKey].delHistFile) groups[subKey].delHistFile = f;
+    else if (isRefAlleles) groups[subKey].allelesFile = f;           // preferred (.txt or .zip)
+    else if (isAlleles && !groups[subKey].allelesFile) groups[subKey].allelesFile = f; // fallback
   });
 
   const subfolders = Object.keys(groups).sort();
@@ -1202,7 +1206,7 @@ function loadResults(files) {
 
   document.getElementById('results-empty').style.display = 'none';
 
-  Promise.all(subfolders.map(sub => parseSample(sub, groups[sub]))).then(results => {
+  Promise.all(subfolders.map(key => parseSample(groups[key].subName, groups[key]))).then(results => {
     resultsData = results.filter(Boolean);
     renderResultsTable();
     renderResultsCharts();
@@ -1219,6 +1223,21 @@ function readFileText(file) {
     r.onerror = () => reject(new Error('FileReader error'));
     r.readAsText(file);
   });
+}
+
+// Read an alleles frequency file — handles both plain .txt and .zip
+async function readAllelesText(file) {
+  if (!file.name.endsWith('.zip')) return readFileText(file);
+  const buf = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error('FileReader error'));
+    r.readAsArrayBuffer(file);
+  });
+  const zip = await JSZip.loadAsync(buf);
+  const txtName = Object.keys(zip.files).find(n => n.endsWith('.txt') && !zip.files[n].dir);
+  if (!txtName) throw new Error('no .txt file found inside zip');
+  return zip.files[txtName].async('string');
 }
 
 // Parse a TSV string into an array of objects keyed by header
@@ -1346,10 +1365,10 @@ async function parseSample(subfolder, files) {
     }
   }
 
-  // FILE 4: alleles frequency table (Reference.Alleles_frequency_table*.txt preferred)
+  // FILE 4: alleles frequency table (.zip or .txt; Reference.* preferred)
   if (files.allelesFile) {
     try {
-      const text = await readFileText(files.allelesFile);
+      const text = await readAllelesText(files.allelesFile);
       const rows = parseTSV(text);
       const clusters = {};
       rows.forEach(row => {
