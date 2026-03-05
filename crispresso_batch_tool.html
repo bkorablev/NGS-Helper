@@ -747,9 +747,9 @@
           <div class="helper-text">e.g. 2 for diploid (RPE-1), 3 for triploid (K562)</div>
         </div>
         <div class="form-group">
-          <label>Large deletion threshold (bp)</label>
+          <label>In-frame deletion override (bp)</label>
           <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
-          <div class="helper-text">Deletions ≥ this size may span an intron</div>
+          <div class="helper-text">In-frame deletions ≥ this size are reclassified as likely disruptive — they may span an exon-intron boundary and still cause KO</div>
         </div>
       </div>
     </div>
@@ -1595,8 +1595,8 @@ function classifyKO(r) {
   if (allStrongKO) {
     status = 'Full KO';
   } else if (!hasWT && anyStrongKO && hasInFrame) {
-    status = 'Full KO ⚠';
-    warnings.push('In-frame mutation detected — verify protein function');
+    status = 'Likely Partial KO';
+    warnings.push('All alleles edited — in-frame mutation may preserve protein function. Check if affected residues are functionally critical.');
   } else if (anyStrongKO) {
     status = 'Partial KO';
   } else {
@@ -1608,11 +1608,11 @@ function classifyKO(r) {
 
 function koStatusBadge(status) {
   const colorMap = {
-    'Full KO':                '#3fb950',
-    'Full KO ⚠':              '#3fb950',
-    'Partial KO':             '#d29922',
-    'No KO':                  '#7d8590',
-    'Insufficient data':      '#7d8590'
+    'Full KO':            '#3fb950',
+    'Likely Partial KO':  '#58a6ff',
+    'Partial KO':         '#d29922',
+    'No KO':              '#7d8590',
+    'Insufficient data':  '#7d8590'
   };
   const c = colorMap[status] || '#7d8590';
   return `<span style="background:${c}22;color:${c};border:1px solid ${c}55;border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono);white-space:nowrap">${status}</span>`;
@@ -1623,17 +1623,20 @@ function renderKOSummaryBar() {
   const good = resultsData.filter(r => !r.failed);
   if (!good.length) { bar.style.display = 'none'; return; }
 
-  let fullKO = 0, partialKO = 0, noKO = 0, insufficient = 0;
+  let fullKO = 0, likelyPartialKO = 0, partialKO = 0, noKO = 0, insufficient = 0;
   good.forEach(r => {
     const { status } = classifyKO(r);
-    if      (status === 'Full KO' || status === 'Full KO ⚠') fullKO++;
-    else if (status === 'Partial KO')                        partialKO++;
-    else if (status === 'No KO')                             noKO++;
-    else                                                     insufficient++;
+    if      (status === 'Full KO')            fullKO++;
+    else if (status === 'Likely Partial KO')  likelyPartialKO++;
+    else if (status === 'Partial KO')         partialKO++;
+    else if (status === 'No KO')              noKO++;
+    else                                      insufficient++;
   });
 
   let html = `
     <span style="color:#3fb950"><strong>${fullKO}</strong> Full KO</span>
+    <span style="color:var(--border)">|</span>
+    <span style="color:#58a6ff"><strong>${likelyPartialKO}</strong> Likely Partial KO</span>
     <span style="color:var(--border)">|</span>
     <span style="color:#d29922"><strong>${partialKO}</strong> Partial KO</span>
     <span style="color:var(--border)">|</span>
