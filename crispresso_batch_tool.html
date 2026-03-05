@@ -719,10 +719,6 @@
           <div class="helper-text">e.g. 2 for diploid (RPE), 3 for triploid (K562)</div>
         </div>
         <div class="form-group">
-          <label>Min % modified reads to count an allele as KO'd</label>
-          <input type="number" id="ko-threshold" value="80" min="0" max="100" style="width:80px" oninput="reEvalKO()">
-        </div>
-        <div class="form-group">
           <label>Large deletion threshold (bp)</label>
           <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
           <div class="helper-text">Deletions ≥ this size may span an intron</div>
@@ -1179,16 +1175,20 @@ function loadResults(files) {
     if (subIdx === -1) return;
     const sub = parts[subIdx];
     const fname = parts[parts.length - 1];
-    const isQuant   = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
-    const isMap     = fname === 'CRISPResso_mapping_statistics.txt';
-    const isRefHist = fname === 'Reference.Deletion_histogram.txt';
-    const isDelHist = fname === 'Deletion_histogram.txt';
-    if (!isQuant && !isMap && !isRefHist && !isDelHist) return;
+    const isQuant      = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
+    const isMap        = fname === 'CRISPResso_mapping_statistics.txt';
+    const isRefHist    = fname === 'Reference.Deletion_histogram.txt';
+    const isDelHist    = fname === 'Deletion_histogram.txt';
+    const isRefAlleles = fname.startsWith('Reference.Alleles_frequency_table');
+    const isAlleles    = fname === 'Alleles_frequency_table.txt';
+    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefAlleles && !isAlleles) return;
     if (!groups[sub]) groups[sub] = {};
-    if (isQuant)        groups[sub].quantFile   = f;
-    else if (isMap)     groups[sub].mapFile     = f;
-    else if (isRefHist) groups[sub].delHistFile = f;           // preferred
-    else if (!groups[sub].delHistFile) groups[sub].delHistFile = f; // fallback
+    if (isQuant)           groups[sub].quantFile   = f;
+    else if (isMap)        groups[sub].mapFile     = f;
+    else if (isRefHist)    groups[sub].delHistFile = f;
+    else if (isDelHist && !groups[sub].delHistFile) groups[sub].delHistFile = f;
+    else if (isRefAlleles) groups[sub].allelesFile = f;           // preferred
+    else if (isAlleles && !groups[sub].allelesFile) groups[sub].allelesFile = f; // fallback
   });
 
   const subfolders = Object.keys(groups).sort();
@@ -1250,7 +1250,9 @@ async function parseSample(subfolder, files) {
     alignedPct: 0,
     // Deletion histogram
     hasDelHist: false, delFsReads: 0, delInFrameReads: 0,
-    delTotalReads: 0, delFsPct: 0, largeDels: []
+    delTotalReads: 0, delFsPct: 0, largeDels: [],
+    // Alleles frequency table — [{nDel, nIns, nMut, freq, readStatus}] sorted by freq desc
+    hasAllelesData: false, topAlleles: []
   };
 
   // FILE 2: mapping statistics
@@ -1344,6 +1346,34 @@ async function parseSample(subfolder, files) {
     }
   }
 
+  // FILE 4: alleles frequency table (Reference.Alleles_frequency_table*.txt preferred)
+  if (files.allelesFile) {
+    try {
+      const text = await readFileText(files.allelesFile);
+      const rows = parseTSV(text);
+      const clusters = {};
+      rows.forEach(row => {
+        if (row['Reference_Name'] !== 'Reference') return;
+        const nDel       = parseInt(row['n_deleted'])  || 0;
+        const nIns       = parseInt(row['n_inserted']) || 0;
+        const nMut       = parseInt(row['n_mutated'])  || 0;
+        const freq       = parseFloat(row['%Reads'])   || 0;
+        const readStatus = (row['Read_Status'] || '').trim();
+        // Separate WT (0,0,UNMODIFIED) from substitution-only (0,0,MODIFIED) clusters
+        const key = (nDel === 0 && nIns === 0)
+          ? `0_0_${readStatus === 'UNMODIFIED' ? 'WT' : 'SUB'}`
+          : `${nDel}_${nIns}`;
+        if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus };
+        clusters[key].freq += freq;
+        clusters[key].nMut  = Math.max(clusters[key].nMut, nMut);
+      });
+      result.topAlleles     = Object.values(clusters).sort((a, b) => b.freq - a.freq);
+      result.hasAllelesData = true;
+    } catch (e) {
+      parseErrors.push(`${name}: failed to read alleles frequency table — ${e.message}`);
+    }
+  }
+
   return result;
 }
 
@@ -1375,9 +1405,16 @@ function renderResultsTable() {
       return;
     }
     const nhejColor = r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)';
-    const { status: koStatus, warnings: koWarnings } = classifyKO(r);
+    const { status: koStatus, warnings: koWarnings, alleles: koAlleles } = classifyKO(r);
     const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
-    const koWarn  = koWarnings.length
+    const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
+    const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
+    const alleleRows = (koAlleles || []).map((a, i) =>
+      `<div>Allele ${i + 1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type] || '#7d8590'}">${a.type}${typeIcon[a.type] || ''} (${alleleLabel(a)})</span></div>`
+    ).join('');
+    const alleleBreakdown = alleleRows
+      ? `<div style="margin-top:5px;font-size:10px;font-family:var(--mono);line-height:1.8">${alleleRows}</div>` : '';
+    const koWarn = koWarnings.length
       ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
       : '';
     html += `<tr>
@@ -1389,7 +1426,7 @@ function renderResultsTable() {
       <td style="font-family:var(--mono);color:${nhejColor}">${r.nhej.toLocaleString()} <span>(${r.nhejPct.toFixed(1)}%)</span></td>
       ${anyHDR ? `<td style="font-family:var(--mono);color:var(--accent2)">${r.hasHDR ? r.totalHDR.toLocaleString() + ' <span>(' + r.hdrPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
       ${anyAmbiguous ? `<td style="font-family:var(--mono);color:var(--muted)">${r.ambiguous > 0 ? r.ambiguous.toLocaleString() + ' <span>(' + r.ambiguousPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
-      <td style="min-width:140px">${koBadge}${koWarn}</td>
+      <td style="min-width:180px">${koBadge}${alleleBreakdown}${koWarn}</td>
     </tr>`;
   });
 
@@ -1435,44 +1472,61 @@ function renderParseErrors() {
   el.style.display = 'block';
 }
 
+function classifyAllele(a, largeDel) {
+  const { nDel, nIns, readStatus } = a;
+  if (readStatus === 'UNMODIFIED' && nDel === 0 && nIns === 0) return 'Wildtype';
+  if (nDel === 0 && nIns === 0) return 'Substitution only';
+  if ((nDel % 3 !== 0) || (nIns % 3 !== 0)) return 'Frameshift';
+  if (nDel >= largeDel) return 'Large in-frame deletion';
+  return 'In-frame';
+}
+
+function alleleLabel(a) {
+  const parts = [];
+  if (a.nDel > 0) parts.push(`${a.nDel}bp del`);
+  if (a.nIns > 0) parts.push(`${a.nIns}bp ins`);
+  return parts.length ? parts.join(', ') : 'no indel';
+}
+
 function classifyKO(r) {
-  if (r.failed) return { status: null, warnings: [] };
-  if (!r.hasDelHist) return { status: 'Insufficient data', warnings: [] };
+  if (r.failed) return { status: null, warnings: [], alleles: [] };
+  if (!r.hasAllelesData) return { status: 'Insufficient data', warnings: [], alleles: [] };
 
-  const ploidy    = Math.max(1, parseInt(document.getElementById('ko-ploidy').value)    || 2);
-  const threshold = parseFloat(document.getElementById('ko-threshold').value) || 80;
-  const largeDel  = Math.max(1, parseInt(document.getElementById('ko-large-del').value) || 50);
+  const ploidy   = Math.max(1, parseInt(document.getElementById('ko-ploidy').value)    || 2);
+  const largeDel = Math.max(1, parseInt(document.getElementById('ko-large-del').value) || 50);
 
-  const modifiedPct     = r.nhejPct + (r.hasHDR ? r.hdrPct : 0);
-  const fullKOThresh    = threshold * (ploidy - 1) / ploidy;
-  const partialKOThresh = threshold / ploidy;
+  const topN = r.topAlleles.slice(0, ploidy);
+  const classified = topN.map(a => ({ ...a, type: classifyAllele(a, largeDel) }));
+
+  const hasWT        = classified.some(a => a.type === 'Wildtype');
+  const allStrongKO  = classified.every(a => a.type === 'Frameshift' || a.type === 'Large in-frame deletion');
+  const anyStrongKO  = classified.some(a => a.type === 'Frameshift'  || a.type === 'Large in-frame deletion');
+  const hasInFrame   = classified.some(a => a.type === 'In-frame');
 
   let status;
-  if      (modifiedPct >= fullKOThresh)    status = 'Full KO';
-  else if (modifiedPct >= partialKOThresh) status = 'Partial KO';
-  else                                     status = 'No KO';
-
   const warnings = [];
-  if (status === 'Full KO' || status === 'Partial KO') {
-    if (r.delFsPct < 50) {
-      warnings.push('⚠ Deletions may be in-frame — verify KO');
-    }
-    r.largeDels.forEach(d => {
-      if (d.size >= largeDel && r.delTotalReads > 0 && (d.fq / r.delTotalReads) > 0.1) {
-        warnings.push(`ℹ Large deletion (${d.size}bp) detected — may span intron`);
-      }
-    });
+
+  if (allStrongKO) {
+    status = 'Full KO';
+  } else if (!hasWT && anyStrongKO && hasInFrame) {
+    status = 'Full KO ⚠';
+    warnings.push('In-frame mutation detected — verify protein function');
+  } else if (anyStrongKO) {
+    status = 'Partial KO';
+  } else {
+    status = 'No KO';
   }
 
-  return { status, warnings };
+  return { status, warnings, alleles: classified };
 }
 
 function koStatusBadge(status) {
   const colorMap = {
-    'Full KO':           '#3fb950',
-    'Partial KO':        '#d29922',
-    'No KO':             '#7d8590',
-    'Insufficient data': '#7d8590'
+    'Full KO':                '#3fb950',
+    'Full KO ⚠':              '#3fb950',
+    'Partial KO':             '#d29922',
+    'No KO':                  '#7d8590',
+    'Insufficient data':      '#7d8590'
   };
   const c = colorMap[status] || '#7d8590';
   return `<span style="background:${c}22;color:${c};border:1px solid ${c}55;border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono);white-space:nowrap">${status}</span>`;
@@ -1486,10 +1540,10 @@ function renderKOSummaryBar() {
   let fullKO = 0, partialKO = 0, noKO = 0, insufficient = 0;
   good.forEach(r => {
     const { status } = classifyKO(r);
-    if      (status === 'Full KO')           fullKO++;
-    else if (status === 'Partial KO')        partialKO++;
-    else if (status === 'No KO')             noKO++;
-    else                                     insufficient++;
+    if      (status === 'Full KO' || status === 'Full KO ⚠') fullKO++;
+    else if (status === 'Partial KO')                        partialKO++;
+    else if (status === 'No KO')                             noKO++;
+    else                                                     insufficient++;
   });
 
   let html = `
@@ -1528,20 +1582,29 @@ function exportResults() {
   const anyHDR = resultsData.some(r => r.hasHDR);
 
   // Sheet 1: Summary
+  const exportPloidy = Math.max(1, parseInt(document.getElementById('ko-ploidy').value) || 2);
+  const alleleHeaders = [];
+  for (let i = 1; i <= exportPloidy; i++) alleleHeaders.push(`Allele${i}_freq`, `Allele${i}_type`);
+
   const summaryHeaders = ['Sample', 'Reads in Input', 'Reads Aligned', 'Aligned %',
     'Unmodified', 'Unmodified %', 'NHEJ', 'NHEJ %',
     ...(anyHDR ? ['HDR (Perfect+Imperfect)', 'HDR %', 'Ambiguous', 'Ambiguous %'] : []),
-    'Status', 'KO Status', 'KO Warnings'];
+    'Status', 'KO Status', 'KO Warnings', ...alleleHeaders];
   const summaryRows = [summaryHeaders, ...resultsData.map(r => {
     const row = [r.name, r.readsInInputs, r.alignedAllAmplicons, r.alignedPct,
                  r.refUnmodified, r.refUnmodifiedPct, r.nhej, r.nhejPct];
     if (anyHDR) row.push(r.totalHDR, r.hdrPct, r.ambiguous, r.ambiguousPct);
     row.push(r.failed ? 'Failed' : 'OK');
     if (!r.failed) {
-      const { status, warnings } = classifyKO(r);
+      const { status, warnings, alleles } = classifyKO(r);
       row.push(status || '—', warnings.join('; '));
+      for (let i = 0; i < exportPloidy; i++) {
+        const a = alleles && alleles[i];
+        row.push(a ? a.freq.toFixed(1) + '%' : '', a ? `${a.type} (${alleleLabel(a)})` : '');
+      }
     } else {
       row.push('', '');
+      for (let i = 0; i < exportPloidy; i++) row.push('', '');
     }
     return row;
   })];
