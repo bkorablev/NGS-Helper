@@ -716,10 +716,10 @@
       <div class="card-title">Editing breakdown</div>
       <div id="results-chart-wrap"></div>
       <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;font-family:var(--mono)">
-        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#58a6ff" rx="2"/></svg>Unmodified</span>
-        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#e07b39" rx="2"/></svg>NHEJ</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#7d8590" rx="2"/></svg>Unmodified</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#f85149" rx="2"/></svg>NHEJ</span>
         <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#3fb950" rx="2"/></svg>HDR</span>
-        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#f85149" rx="2"/></svg>Ambiguous</span>
+        <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#d29922" rx="2"/></svg>Ambiguous</span>
       </div>
     </div>
 
@@ -1345,10 +1345,10 @@ function renderResultsCharts() {
       if (w > 38) svg += `<text x="${x + w/2}" y="${y + BAR_H/2 + 4}" text-anchor="middle" fill="#fff" font-size="10" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
       x += w;
     };
-    seg(r.refUnmodifiedPct, '#58a6ff', r.refUnmodifiedPct.toFixed(1) + '%');  // blue
-    seg(r.nhejPct,          '#e07b39', r.nhejPct.toFixed(1)          + '%');  // orange
-    if (r.hasHDR)         seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');  // green
-    if (r.ambiguous > 0)  seg(r.ambiguousPct, '#f85149', r.ambiguousPct.toFixed(1) + '%');  // red
+    seg(r.refUnmodifiedPct, '#7d8590', r.refUnmodifiedPct.toFixed(1) + '%');  // --muted
+    seg(r.nhejPct,          '#f85149', r.nhejPct.toFixed(1)          + '%');  // --error
+    if (r.hasHDR)         seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');  // --accent2
+    if (r.ambiguous > 0)  seg(r.ambiguousPct, '#d29922', r.ambiguousPct.toFixed(1) + '%');  // --warn
   });
 
   svg += '</svg>';
