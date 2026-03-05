@@ -348,6 +348,37 @@
   }
   .fill-flash { animation: fillFlash 0.6s ease-out; }
 
+  /* Toggle switch */
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 20px;
+    transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+
   /* Loading spinner */
   #results-loading {
     display: none;
@@ -735,11 +766,17 @@
   </div>
 
   <div class="card" id="ko-settings-card">
-    <div class="card-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none" onclick="toggleKOSettings()">
-      <span>KO Classification Settings</span>
-      <span id="ko-settings-arrow" style="font-size:11px;color:var(--muted);font-family:var(--mono)">▼</span>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="card-title" style="margin-bottom:0">KO Classification</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;font-family:var(--mono);color:var(--muted)">Enable KO Classification</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ko-enabled" onchange="onKOToggle()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
-    <div id="ko-settings-body" style="margin-top:8px">
+    <div id="ko-settings-body" style="display:none;margin-top:12px">
       <div class="form-row">
         <div class="form-group">
           <label>Expected allele copies</label>
@@ -761,6 +798,9 @@
   </div>
 
   <div id="results-content" style="display:none">
+    <div id="ko-reload-msg" style="display:none;background:var(--surface2);border:1px solid var(--warn);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:13px;color:var(--warn)">
+      ℹ Reload results to include KO classification
+    </div>
     <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
     <div class="card">
       <div class="card-title">Summary</div>
@@ -1189,6 +1229,7 @@ function copyCmd() {
 
 // ─── Results aggregator ───────────────────────────────────────────────────────
 let resultsData = [];
+let resultsLoadedWithKO = false;
 const parseErrors = [];
 
 function setLoadingMsg(msg) {
@@ -1257,14 +1298,21 @@ function loadResults(files) {
     return;
   }
 
+  const koOn = koEnabled();
+  resultsLoadedWithKO = koOn;
+
   let parsed = 0;
   const total = subfolders.length;
   setLoadingMsg(`Parsing sample 1 of ${total}…`);
 
   Promise.all(subfolders.map(key => {
-    const hasZip = groups[key].allelesFile && groups[key].allelesFile.name.endsWith('.zip');
-    if (hasZip) setLoadingMsg(`Unzipping allele table for sample ${parsed + 1} of ${total}…`);
-    return parseSample(groups[key].subName, groups[key]).then(r => {
+    const g = groups[key];
+    // When KO is OFF, strip the alleles file so parseSample skips unzipping
+    const effectiveFiles = koOn ? g : { ...g, allelesFile: null };
+    if (koOn && g.allelesFile && g.allelesFile.name.endsWith('.zip')) {
+      setLoadingMsg(`Unzipping allele table for sample ${parsed + 1} of ${total}…`);
+    }
+    return parseSample(g.subName, effectiveFiles).then(r => {
       parsed++;
       if (parsed < total) setLoadingMsg(`Parsing sample ${parsed + 1} of ${total}…`);
       else                setLoadingMsg('Building summary…');
@@ -1272,6 +1320,7 @@ function loadResults(files) {
     });
   })).then(results => {
     resultsData = results.filter(Boolean);
+    document.getElementById('ko-reload-msg').style.display = 'none';
     renderResultsTable();
     renderResultsCharts();
     renderParseErrors();
@@ -1468,7 +1517,8 @@ function pct(n, total) { return total ? ((n / total) * 100).toFixed(1) : '0.0'; 
 function renderResultsTable() {
   const anyHDR = resultsData.some(r => r.hasHDR);
   const anyAmbiguous = anyHDR && resultsData.some(r => r.ambiguous > 0);
-  const NCOLS = 6 + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
+  const showKO = koEnabled() && resultsLoadedWithKO;
+  const NCOLS = (showKO ? 6 : 5) + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
 
   let html = `<table><thead><tr>
     <th>Sample</th>
@@ -1479,7 +1529,7 @@ function renderResultsTable() {
     <th>NHEJ</th>
     ${anyHDR ? '<th>HDR</th>' : ''}
     ${anyAmbiguous ? '<th>Ambiguous</th>' : ''}
-    <th>KO Status</th>
+    ${showKO ? '<th>KO Status</th>' : ''}
   </tr></thead><tbody>`;
 
   resultsData.forEach(r => {
@@ -1491,18 +1541,22 @@ function renderResultsTable() {
       return;
     }
     const nhejColor = r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)';
-    const { status: koStatus, warnings: koWarnings, alleles: koAlleles } = classifyKO(r);
-    const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
-    const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
-    const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
-    const alleleRows = (koAlleles || []).map((a, i) =>
-      `<div>Allele ${i + 1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type] || '#7d8590'}">${a.type}${typeIcon[a.type] || ''} (${alleleLabel(a)})</span></div>`
-    ).join('');
-    const alleleBreakdown = alleleRows
-      ? `<div style="margin-top:5px;font-size:10px;font-family:var(--mono);line-height:1.8">${alleleRows}</div>` : '';
-    const koWarn = koWarnings.length
-      ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
-      : '';
+    let koCell = '';
+    if (showKO) {
+      const { status: koStatus, warnings: koWarnings, alleles: koAlleles } = classifyKO(r);
+      const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
+      const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
+      const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
+      const alleleRows = (koAlleles || []).map((a, i) =>
+        `<div>Allele ${i + 1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type] || '#7d8590'}">${a.type}${typeIcon[a.type] || ''} (${alleleLabel(a)})</span></div>`
+      ).join('');
+      const alleleBreakdown = alleleRows
+        ? `<div style="margin-top:5px;font-size:10px;font-family:var(--mono);line-height:1.8">${alleleRows}</div>` : '';
+      const koWarn = koWarnings.length
+        ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
+        : '';
+      koCell = `<td style="min-width:180px">${koBadge}${alleleBreakdown}${koWarn}</td>`;
+    }
     html += `<tr>
       <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
       <td style="font-family:var(--mono)">${r.readsInInputs.toLocaleString()}</td>
@@ -1512,7 +1566,7 @@ function renderResultsTable() {
       <td style="font-family:var(--mono);color:${nhejColor}">${r.nhej.toLocaleString()} <span>(${r.nhejPct.toFixed(1)}%)</span></td>
       ${anyHDR ? `<td style="font-family:var(--mono);color:var(--accent2)">${r.hasHDR ? r.totalHDR.toLocaleString() + ' <span>(' + r.hdrPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
       ${anyAmbiguous ? `<td style="font-family:var(--mono);color:var(--muted)">${r.ambiguous > 0 ? r.ambiguous.toLocaleString() + ' <span>(' + r.ambiguousPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
-      <td style="min-width:180px">${koBadge}${alleleBreakdown}${koWarn}</td>
+      ${koCell}
     </tr>`;
   });
 
@@ -1621,7 +1675,7 @@ function koStatusBadge(status) {
 function renderKOSummaryBar() {
   const bar  = document.getElementById('ko-summary-bar');
   const good = resultsData.filter(r => !r.failed);
-  if (!good.length) { bar.style.display = 'none'; return; }
+  if (!good.length || !koEnabled() || !resultsLoadedWithKO) { bar.style.display = 'none'; return; }
 
   let fullKO = 0, likelyPartialKO = 0, partialKO = 0, noKO = 0, insufficient = 0;
   good.forEach(r => {
@@ -1652,12 +1706,18 @@ function renderKOSummaryBar() {
   bar.innerHTML = html;
 }
 
-function toggleKOSettings() {
-  const body  = document.getElementById('ko-settings-body');
-  const arrow = document.getElementById('ko-settings-arrow');
-  const open  = body.style.display !== 'none';
-  body.style.display = open ? 'none' : '';
-  arrow.textContent  = open ? '▶' : '▼';
+function koEnabled() {
+  return document.getElementById('ko-enabled').checked;
+}
+
+function onKOToggle() {
+  const enabled = koEnabled();
+  document.getElementById('ko-settings-body').style.display = enabled ? '' : 'none';
+  if (!resultsData.length) return;
+  const reloadNeeded = enabled && !resultsLoadedWithKO;
+  document.getElementById('ko-reload-msg').style.display = reloadNeeded ? 'block' : 'none';
+  renderResultsTable();
+  renderKOSummaryBar();
 }
 
 function reEvalKO() {
