@@ -1153,9 +1153,12 @@ function loadResults(files) {
     if (subIdx === -1) return;
     const sub = parts[subIdx];
     const fname = parts[parts.length - 1];
+    const isQuant = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
+    const isMap   = fname === 'CRISPResso_mapping_statistics.txt';
+    if (!isQuant && !isMap) return;
     if (!groups[sub]) groups[sub] = {};
-    if (fname === 'CRISPResso_quantification_of_editing_frequency.txt') groups[sub].quantFile = f;
-    else if (fname === 'CRISPResso_mapping_statistics.txt') groups[sub].mapFile = f;
+    if (isQuant) groups[sub].quantFile = f;
+    else         groups[sub].mapFile   = f;
   });
 
   const subfolders = Object.keys(groups).sort();
