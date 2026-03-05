@@ -379,6 +379,9 @@
   .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
   .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
 
+  /* KO column visibility */
+  .ko-col.ko-hidden { display: none; }
+
   /* Loading spinner */
   #results-loading {
     display: none;
@@ -798,9 +801,6 @@
   </div>
 
   <div id="results-content" style="display:none">
-    <div id="ko-reload-msg" style="display:none;background:var(--surface2);border:1px solid var(--warn);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:13px;color:var(--warn)">
-      ℹ Reload results to include KO classification
-    </div>
     <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
     <div class="card">
       <div class="card-title">Summary</div>
@@ -1307,8 +1307,9 @@ function loadResults(files) {
 
   Promise.all(subfolders.map(key => {
     const g = groups[key];
-    // When KO is OFF, strip the alleles file so parseSample skips unzipping
-    const effectiveFiles = koOn ? g : { ...g, allelesFile: null };
+    // Always pass the file reference so it can be re-used if KO is enabled later.
+    // parseKO flag tells parseSample whether to actually unzip and parse it now.
+    const effectiveFiles = { ...g, parseKO: koOn };
     if (koOn && g.allelesFile && g.allelesFile.name.endsWith('.zip')) {
       setLoadingMsg(`Unzipping allele table for sample ${parsed + 1} of ${total}…`);
     }
@@ -1320,7 +1321,6 @@ function loadResults(files) {
     });
   })).then(results => {
     resultsData = results.filter(Boolean);
-    document.getElementById('ko-reload-msg').style.display = 'none';
     renderResultsTable();
     renderResultsCharts();
     renderParseErrors();
@@ -1481,44 +1481,69 @@ async function parseSample(subfolder, files) {
     }
   }
 
-  // FILE 4: alleles frequency table (.zip or .txt; Reference.* preferred)
-  if (files.allelesFile) {
-    try {
-      const text = await readAllelesText(files.allelesFile);
-      const rows = parseTSV(text);
-      const clusters = {};
-      rows.forEach(row => {
-        if (row['Reference_Name'] !== 'Reference') return;
-        const nDel       = parseInt(row['n_deleted'])  || 0;
-        const nIns       = parseInt(row['n_inserted']) || 0;
-        const nMut       = parseInt(row['n_mutated'])  || 0;
-        const freq       = parseFloat(row['%Reads'])   || 0;
-        const readStatus = (row['Read_Status'] || '').trim();
-        // Separate WT (0,0,UNMODIFIED) from substitution-only (0,0,MODIFIED) clusters
-        const key = (nDel === 0 && nIns === 0)
-          ? `0_0_${readStatus === 'UNMODIFIED' ? 'WT' : 'SUB'}`
-          : `${nDel}_${nIns}`;
-        if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus };
-        clusters[key].freq += freq;
-        clusters[key].nMut  = Math.max(clusters[key].nMut, nMut);
-      });
-      result.topAlleles     = Object.values(clusters).sort((a, b) => b.freq - a.freq);
-      result.hasAllelesData = true;
-    } catch (e) {
-      parseErrors.push(`${name}: failed to read alleles frequency table — ${e.message}`);
-    }
+  // FILE 4: alleles frequency table — always store file ref; parse only when parseKO is set
+  result.allelesFileRef = files.allelesFile || null;
+  if (files.allelesFile && files.parseKO) {
+    await parseAllelesIntoResult(result, files.allelesFile);
   }
 
   return result;
 }
 
+// Parse an alleles frequency file into an existing result object (shared by parseSample + runKOOnDemand)
+async function parseAllelesIntoResult(result, file) {
+  try {
+    const text = await readAllelesText(file);
+    const rows = parseTSV(text);
+    const clusters = {};
+    rows.forEach(row => {
+      if (row['Reference_Name'] !== 'Reference') return;
+      const nDel       = parseInt(row['n_deleted'])  || 0;
+      const nIns       = parseInt(row['n_inserted']) || 0;
+      const nMut       = parseInt(row['n_mutated'])  || 0;
+      const freq       = parseFloat(row['%Reads'])   || 0;
+      const readStatus = (row['Read_Status'] || '').trim();
+      // Separate WT (0,0,UNMODIFIED) from substitution-only (0,0,MODIFIED) clusters
+      const key = (nDel === 0 && nIns === 0)
+        ? `0_0_${readStatus === 'UNMODIFIED' ? 'WT' : 'SUB'}`
+        : `${nDel}_${nIns}`;
+      if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus };
+      clusters[key].freq += freq;
+      clusters[key].nMut  = Math.max(clusters[key].nMut, nMut);
+    });
+    result.topAlleles     = Object.values(clusters).sort((a, b) => b.freq - a.freq);
+    result.hasAllelesData = true;
+  } catch (e) {
+    parseErrors.push(`${result.name}: failed to read alleles frequency table — ${e.message}`);
+  }
+}
+
 function pct(n, total) { return total ? ((n / total) * 100).toFixed(1) : '0.0'; }
+
+function buildKOCellHTML(r, idx) {
+  const idxAttr = idx !== undefined ? ` data-sample-index="${idx}"` : '';
+  if (r.failed) return `<td class="ko-col" data-ko-cell${idxAttr}></td>`;
+  const { status: koStatus, warnings: koWarnings, alleles: koAlleles } = classifyKO(r);
+  const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
+  const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
+  const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
+  const alleleRows = (koAlleles || []).map((a, i) =>
+    `<div>Allele ${i + 1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type] || '#7d8590'}">${a.type}${typeIcon[a.type] || ''} (${alleleLabel(a)})</span></div>`
+  ).join('');
+  const alleleBreakdown = alleleRows
+    ? `<div style="margin-top:5px;font-size:10px;font-family:var(--mono);line-height:1.8">${alleleRows}</div>` : '';
+  const koWarn = koWarnings.length
+    ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
+    : '';
+  return `<td class="ko-col" data-ko-cell${idxAttr} style="min-width:180px">${koBadge}${alleleBreakdown}${koWarn}</td>`;
+}
 
 function renderResultsTable() {
   const anyHDR = resultsData.some(r => r.hasHDR);
   const anyAmbiguous = anyHDR && resultsData.some(r => r.ambiguous > 0);
-  const showKO = koEnabled() && resultsLoadedWithKO;
-  const NCOLS = (showKO ? 6 : 5) + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
+  const koVisible = koEnabled() && resultsLoadedWithKO;
+  const koHiddenClass = koVisible ? '' : ' ko-hidden';
+  const NCOLS = 5 + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
 
   let html = `<table><thead><tr>
     <th>Sample</th>
@@ -1529,34 +1554,22 @@ function renderResultsTable() {
     <th>NHEJ</th>
     ${anyHDR ? '<th>HDR</th>' : ''}
     ${anyAmbiguous ? '<th>Ambiguous</th>' : ''}
-    ${showKO ? '<th>KO Status</th>' : ''}
+    <th class="ko-col${koHiddenClass}">KO Status</th>
   </tr></thead><tbody>`;
 
-  resultsData.forEach(r => {
+  resultsData.forEach((r, idx) => {
     if (r.failed) {
       html += `<tr>
         <td style="font-family:var(--mono);color:var(--error)">${r.name}</td>
         <td colspan="${NCOLS}" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
+        <td class="ko-col${koHiddenClass}" data-sample-index="${idx}" data-ko-cell></td>
       </tr>`;
       return;
     }
     const nhejColor = r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)';
-    let koCell = '';
-    if (showKO) {
-      const { status: koStatus, warnings: koWarnings, alleles: koAlleles } = classifyKO(r);
-      const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
-      const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
-      const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
-      const alleleRows = (koAlleles || []).map((a, i) =>
-        `<div>Allele ${i + 1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type] || '#7d8590'}">${a.type}${typeIcon[a.type] || ''} (${alleleLabel(a)})</span></div>`
-      ).join('');
-      const alleleBreakdown = alleleRows
-        ? `<div style="margin-top:5px;font-size:10px;font-family:var(--mono);line-height:1.8">${alleleRows}</div>` : '';
-      const koWarn = koWarnings.length
-        ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
-        : '';
-      koCell = `<td style="min-width:180px">${koBadge}${alleleBreakdown}${koWarn}</td>`;
-    }
+    const koTD = koVisible
+      ? buildKOCellHTML(r, idx)
+      : `<td class="ko-col ko-hidden" data-sample-index="${idx}" data-ko-cell></td>`;
     html += `<tr>
       <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
       <td style="font-family:var(--mono)">${r.readsInInputs.toLocaleString()}</td>
@@ -1566,12 +1579,33 @@ function renderResultsTable() {
       <td style="font-family:var(--mono);color:${nhejColor}">${r.nhej.toLocaleString()} <span>(${r.nhejPct.toFixed(1)}%)</span></td>
       ${anyHDR ? `<td style="font-family:var(--mono);color:var(--accent2)">${r.hasHDR ? r.totalHDR.toLocaleString() + ' <span>(' + r.hdrPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
       ${anyAmbiguous ? `<td style="font-family:var(--mono);color:var(--muted)">${r.ambiguous > 0 ? r.ambiguous.toLocaleString() + ' <span>(' + r.ambiguousPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
-      ${koCell}
+      ${koTD}
     </tr>`;
   });
 
   html += '</tbody></table>';
   document.getElementById('results-table-wrap').innerHTML = html;
+}
+
+function updateKOCells() {
+  document.querySelectorAll('[data-sample-index][data-ko-cell]').forEach(td => {
+    const idx = parseInt(td.getAttribute('data-sample-index'));
+    const r = resultsData[idx];
+    if (!r || r.failed) return;
+    const tmp = document.createElement('table');
+    tmp.innerHTML = '<tr>' + buildKOCellHTML(r) + '</tr>';
+    const parsed = tmp.querySelector('td');
+    td.innerHTML = parsed.innerHTML;
+    td.style.cssText = parsed.getAttribute('style') || '';
+  });
+}
+
+function showKOColumn() {
+  document.querySelectorAll('.ko-col').forEach(el => el.classList.remove('ko-hidden'));
+}
+
+function hideKOColumn() {
+  document.querySelectorAll('.ko-col').forEach(el => el.classList.add('ko-hidden'));
 }
 
 function renderResultsCharts() {
@@ -1714,15 +1748,41 @@ function onKOToggle() {
   const enabled = koEnabled();
   document.getElementById('ko-settings-body').style.display = enabled ? '' : 'none';
   if (!resultsData.length) return;
-  const reloadNeeded = enabled && !resultsLoadedWithKO;
-  document.getElementById('ko-reload-msg').style.display = reloadNeeded ? 'block' : 'none';
-  renderResultsTable();
-  renderKOSummaryBar();
+  if (enabled && !resultsLoadedWithKO) {
+    runKOOnDemand();
+  } else if (enabled) {
+    showKOColumn();
+    renderKOSummaryBar();
+  } else {
+    hideKOColumn();
+    renderKOSummaryBar();
+  }
+}
+
+async function runKOOnDemand() {
+  showSpinner();
+  setLoadingMsg('Running KO classification…');
+  try {
+    await Promise.all(resultsData.map(r => {
+      if (r.hasAllelesData || !r.allelesFileRef) return Promise.resolve();
+      return parseAllelesIntoResult(r, r.allelesFileRef);
+    }));
+    resultsLoadedWithKO = true;
+    updateKOCells();
+    showKOColumn();
+    renderKOSummaryBar();
+  } catch (e) {
+    console.error('KO classification failed:', e);
+  } finally {
+    hideSpinner();
+    document.getElementById('results-loading').style.display = 'none';
+    document.getElementById('results-content').style.display = 'block';
+  }
 }
 
 function reEvalKO() {
   if (!resultsData.length) return;
-  renderResultsTable();
+  updateKOCells();
   renderKOSummaryBar();
 }
 
