@@ -670,10 +670,6 @@
     <div class="card-title">Output</div>
     <div class="form-row">
       <div class="form-group">
-        <label>Output folder name</label>
-        <input type="text" id="param-output" value="CRISPRessoBatch_output" placeholder="CRISPRessoBatch_output">
-      </div>
-      <div class="form-group">
         <label>Batch name</label>
         <input type="text" id="param-name" value="batch" placeholder="batch">
       </div>
@@ -1148,12 +1144,6 @@ function runValidation() {
     checks.push({ type: 'ok', msg: 'All sample labels are unique.' });
   }
 
-  // Check 8: output folder
-  const outName = document.getElementById('param-output').value.trim();
-  if (!outName) {
-    checks.push({ type: 'warn', msg: 'No output folder name set — will use CRISPRessoWGS default.' });
-  }
-
   list.innerHTML = checks.map(c => `
     <div class="val-item val-${c.type}">
       <span class="val-icon">${c.type==='ok'?'✅':c.type==='warn'?'⚠️':'❌'}</span>
@@ -1187,16 +1177,13 @@ function buildExport() {
 
   const batchNameVal = document.getElementById('param-name').value.trim();
   const batchName = (batchNameVal || 'batch') + '.batch';
-  const outputDir = document.getElementById('param-output').value.trim();
   const qw = document.getElementById('param-qw').value.trim();
   const minfreq = document.getElementById('param-minfreq').value.trim();
   const extra = document.getElementById('param-extra').value.trim();
 
   let cmd = `CRISPRessoBatch --batch_settings ${batchName}`;
-  if (outputDir && outputDir !== 'CRISPRessoBatch_output') cmd += ` --output_folder ${outputDir}`;
   if (qw && qw !== '1') cmd += ` --quantification_window_size ${qw}`;
   if (minfreq && minfreq !== '0.2') cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
-  if (batchNameVal && batchNameVal !== 'batch') cmd += ` --name ${batchNameVal}`;
   if (extra) cmd += ` ${extra}`;
 
   document.getElementById('run-cmd').textContent = cmd;
