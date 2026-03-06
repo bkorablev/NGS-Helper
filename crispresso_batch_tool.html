@@ -1675,6 +1675,12 @@ function classifyKO(r) {
   const topN = r.topAlleles.slice(0, ploidy);
   const classified = topN.map(a => ({ ...a, type: classifyAllele(a, largeDel) }));
 
+  // Noise cutoff: if the top allele is Wildtype at ≥90%, minor alleles are likely
+  // sequencing noise — classify as No KO regardless of what they look like.
+  if (classified.length > 0 && classified[0].type === 'Wildtype' && classified[0].freq >= 90) {
+    return { status: 'No KO', warnings: [], alleles: classified };
+  }
+
   const hasWT        = classified.some(a => a.type === 'Wildtype');
   const allStrongKO  = classified.every(a => a.type === 'Frameshift' || a.type === 'Large in-frame deletion');
   const anyStrongKO  = classified.some(a => a.type === 'Frameshift'  || a.type === 'Large in-frame deletion');
