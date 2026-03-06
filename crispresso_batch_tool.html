@@ -627,7 +627,7 @@
   <p class="subtitle">Select your paired-end FASTQ files. R1/R2 pairs are auto-detected from Illumina naming (<code style="color:var(--accent)">_R1_001</code> / <code style="color:var(--accent)">_R2_001</code>).</p>
 
   <div class="dropzone" id="dropzone">
-    <input type="file" id="fastq-input" multiple accept=".fastq,.fastq.gz,.fq,.fq.gz" onchange="handleFiles(this.files)">
+    <input type="file" id="fastq-input" multiple onchange="handleFiles(this.files)">
     <div class="dropzone-icon">🧬</div>
     <p><strong>Click to browse or drag & drop FASTQ files</strong></p>
     <p style="margin-top:6px">Accepts .fastq, .fastq.gz, .fq, .fq.gz &nbsp;·&nbsp; Paired-end (R1 + R2)</p>
@@ -740,6 +740,7 @@
 
   <div class="btn-row">
     <button class="btn btn-success" onclick="downloadBatch()">⬇ Download .batch file</button>
+    <button class="btn btn-secondary" onclick="downloadBatchXlsx()">⬇ Download as Excel (.xlsx)</button>
     <button class="btn btn-secondary" onclick="copyCmd()">Copy run command</button>
     <button class="btn btn-secondary" onclick="goStep(2)">← Edit samples</button>
   </div>
@@ -937,6 +938,7 @@ function clearFiles() {
 
 // Drag and drop
 const dz = document.getElementById('dropzone');
+
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
 dz.addEventListener('drop', e => {
@@ -1197,6 +1199,27 @@ function downloadBatch() {
   a.href = URL.createObjectURL(blob);
   a.download = batchName;
   a.click();
+}
+
+function downloadBatchXlsx() {
+  const batchNameVal = document.getElementById('param-name').value.trim() || 'batch';
+  const hasHDR = samples.some(s => s.hdr_seq);
+  const cols = ['name', 'fastq_r1', 'fastq_r2', 'amplicon_seq', 'guide_seq'];
+  if (hasHDR) cols.push('expected_hdr_amplicon_seq');
+  const rows = [cols];
+  samples.forEach(s => {
+    rows.push(cols.map(c => {
+      if (c === 'name') return s.label || '';
+      if (c === 'fastq_r1') return s.r1 || '';
+      if (c === 'fastq_r2') return s.r2 || '';
+      if (c === 'amplicon_seq') return s.amplicon || '';
+      if (c === 'guide_seq') return s.guide || '';
+      if (c === 'expected_hdr_amplicon_seq') return s.hdr_seq || '';
+    }));
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'batch');
+  XLSX.writeFile(wb, batchNameVal + '.xlsx');
 }
 
 function copyCmd() {
