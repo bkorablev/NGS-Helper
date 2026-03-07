@@ -1678,6 +1678,7 @@ function classifyKO(r) {
   const allStrongKO  = classified.every(a => a.type === 'Frameshift' || a.type === 'Large in-frame deletion');
   const anyStrongKO  = classified.some(a => a.type === 'Frameshift'  || a.type === 'Large in-frame deletion');
   const hasInFrame   = classified.some(a => a.type === 'In-frame');
+  const allInFrame   = classified.every(a => a.type === 'In-frame');
 
   let status;
   const warnings = [];
@@ -1689,6 +1690,8 @@ function classifyKO(r) {
     warnings.push('All alleles edited — in-frame mutation may preserve protein function. Check if affected residues are functionally critical.');
   } else if (anyStrongKO) {
     status = 'Partial KO';
+  } else if (!hasWT && allInFrame) {
+    status = 'Unlikely KO';
   } else {
     status = 'No KO';
   }
@@ -1701,6 +1704,7 @@ function koStatusBadge(status) {
     'Full KO':            '#3fb950',
     'Likely Partial KO':  '#58a6ff',
     'Partial KO':         '#d29922',
+    'Unlikely KO':        '#7d8590',
     'No KO':              '#7d8590',
     'Insufficient data':  '#7d8590'
   };
@@ -1713,12 +1717,13 @@ function renderKOSummaryBar() {
   const good = resultsData.filter(r => !r.failed);
   if (!good.length || !koEnabled() || !resultsLoadedWithKO) { bar.style.display = 'none'; return; }
 
-  let fullKO = 0, likelyPartialKO = 0, partialKO = 0, noKO = 0, insufficient = 0;
+  let fullKO = 0, likelyPartialKO = 0, partialKO = 0, unlikelyKO = 0, noKO = 0, insufficient = 0;
   good.forEach(r => {
     const { status } = classifyKO(r);
     if      (status === 'Full KO')            fullKO++;
     else if (status === 'Likely Partial KO')  likelyPartialKO++;
     else if (status === 'Partial KO')         partialKO++;
+    else if (status === 'Unlikely KO')        unlikelyKO++;
     else if (status === 'No KO')              noKO++;
     else                                      insufficient++;
   });
@@ -1729,6 +1734,8 @@ function renderKOSummaryBar() {
     <span style="color:#58a6ff"><strong>${likelyPartialKO}</strong> Likely Partial KO</span>
     <span style="color:var(--border)">|</span>
     <span style="color:#d29922"><strong>${partialKO}</strong> Partial KO</span>
+    <span style="color:var(--border)">|</span>
+    <span style="color:#7d8590"><strong>${unlikelyKO}</strong> Unlikely KO</span>
     <span style="color:var(--border)">|</span>
     <span style="color:#7d8590"><strong>${noKO}</strong> No KO</span>`;
   if (insufficient > 0) html += `
