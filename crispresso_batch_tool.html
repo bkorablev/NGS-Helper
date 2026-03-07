@@ -1301,8 +1301,8 @@ function loadResults(files) {
     return;
   }
 
-  const koOn = koEnabled();
-  resultsLoadedWithKO = koOn;
+  // Phase 1 always skips alleles — zip unzipping happens in Phase 2 only.
+  resultsLoadedWithKO = false;
 
   let parsed = 0;
   const total = subfolders.length;
@@ -1310,26 +1310,24 @@ function loadResults(files) {
 
   Promise.all(subfolders.map(key => {
     const g = groups[key];
-    // Always pass the file reference so it can be re-used if KO is enabled later.
-    // parseKO flag tells parseSample whether to actually unzip and parse it now.
-    const effectiveFiles = { ...g, parseKO: koOn };
-    if (koOn && g.allelesFile && g.allelesFile.name.endsWith('.zip')) {
-      setLoadingMsg(`Unzipping allele table for sample ${parsed + 1} of ${total}…`);
-    }
-    return parseSample(g.subName, effectiveFiles).then(r => {
+    return parseSample(g.subName, { ...g, parseKO: false }).then(r => {
       parsed++;
       if (parsed < total) setLoadingMsg(`Parsing sample ${parsed + 1} of ${total}…`);
       else                setLoadingMsg('Building summary…');
       return r;
     });
   })).then(results => {
-    resultsData = results.filter(Boolean);
+    resultsData = results.filter(Boolean).sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
     renderResultsTable();
     renderResultsCharts();
     renderParseErrors();
     renderKOSummaryBar();
     hideSpinner();
     document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
+    // Phase 2: unzip alleles and run KO classification in the background if enabled.
+    if (koEnabled() && resultsData.length) runKOOnDemand(false);
   }).catch(() => {
     hideSpinner();
   });
@@ -1393,63 +1391,63 @@ async function parseSample(subfolder, files) {
     hasAllelesData: false, topAlleles: []
   };
 
+  // Read the three text files in parallel — each resolves to text or null on error.
+  const safeRead = (file, label) =>
+    file ? readFileText(file).catch(e => { parseErrors.push(`${name}: failed to read ${label} — ${e.message}`); return null; })
+         : Promise.resolve(null);
+
+  const [mapText, quantText, delHistText] = await Promise.all([
+    safeRead(files.mapFile,     'CRISPResso_mapping_statistics.txt'),
+    safeRead(files.quantFile,   'CRISPResso_quantification_of_editing_frequency.txt'),
+    safeRead(files.delHistFile, 'deletion histogram'),
+  ]);
+
   // FILE 2: mapping statistics
-  if (files.mapFile) {
-    try {
-      const text = await readFileText(files.mapFile);
-      const rows = parseTSV(text);
-      if (rows.length) {
-        const row = rows[0];
-        result.readsInInputs       = parseInt(row['READS IN INPUTS'])       || 0;
-        result.alignedAllAmplicons = parseInt(row['READS ALIGNED'])         || 0;
-      }
-    } catch (e) {
-      parseErrors.push(`${name}: failed to read CRISPResso_mapping_statistics.txt — ${e.message}`);
+  if (mapText) {
+    const rows = parseTSV(mapText);
+    if (rows.length) {
+      const row = rows[0];
+      result.readsInInputs       = parseInt(row['READS IN INPUTS']) || 0;
+      result.alignedAllAmplicons = parseInt(row['READS ALIGNED'])   || 0;
     }
   }
 
   // FILE 1: quantification of editing frequency
-  if (files.quantFile) {
-    try {
-      const text = await readFileText(files.quantFile);
-      const rows = parseTSV(text);
-      if (!rows.length) {
-        parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt has no data rows`);
-        result.failed = true;
-      } else {
-        const refRow = rows.find(r => r['Amplicon'] === 'Reference') || rows[0];
-        const hdrRow = rows.find(r => r['Amplicon'] === 'HDR');
-
-        // Prefer quant file values for totals (authoritative)
-        result.readsInInputs       = parseInt(refRow['Reads_in_input'])              || result.readsInInputs;
-        result.alignedAllAmplicons = parseInt(refRow['Reads_aligned_all_amplicons']) || result.alignedAllAmplicons;
-
-        // Reference row: Unmodified = unedited reads, Modified = NHEJ reads
-        result.refUnmodified = parseInt(refRow['Unmodified']) || 0;
-        result.nhej          = parseInt(refRow['Modified'])   || 0;
-
-        if (hdrRow) {
-          result.hasHDR      = true;
-          // HDR row: Unmodified = perfect HDR, Modified = imperfect HDR
-          result.hdrUnmodified = parseInt(hdrRow['Unmodified']) || 0;
-          result.hdrModified   = parseInt(hdrRow['Modified'])   || 0;
-          result.totalHDR      = result.hdrUnmodified + result.hdrModified;
-        }
-
-        // Ambiguous = reads not accounted for by any category
-        const aln = result.alignedAllAmplicons || 1;
-        result.ambiguous = Math.max(0, aln - result.refUnmodified - result.nhej - result.totalHDR);
-
-        // All percentages use alignedAllAmplicons as denominator
-        result.refUnmodifiedPct = +((result.refUnmodified / aln) * 100).toFixed(1);
-        result.nhejPct          = +((result.nhej          / aln) * 100).toFixed(1);
-        result.hdrPct           = +((result.totalHDR      / aln) * 100).toFixed(1);
-        result.ambiguousPct     = +((result.ambiguous     / aln) * 100).toFixed(1);
-        result.alignedPct       = +((result.alignedAllAmplicons / (result.readsInInputs || 1)) * 100).toFixed(1);
-      }
-    } catch (e) {
-      parseErrors.push(`${name}: failed to read CRISPResso_quantification_of_editing_frequency.txt — ${e.message}`);
+  if (quantText) {
+    const rows = parseTSV(quantText);
+    if (!rows.length) {
+      parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt has no data rows`);
       result.failed = true;
+    } else {
+      const refRow = rows.find(r => r['Amplicon'] === 'Reference') || rows[0];
+      const hdrRow = rows.find(r => r['Amplicon'] === 'HDR');
+
+      // Prefer quant file values for totals (authoritative)
+      result.readsInInputs       = parseInt(refRow['Reads_in_input'])              || result.readsInInputs;
+      result.alignedAllAmplicons = parseInt(refRow['Reads_aligned_all_amplicons']) || result.alignedAllAmplicons;
+
+      // Reference row: Unmodified = unedited reads, Modified = NHEJ reads
+      result.refUnmodified = parseInt(refRow['Unmodified']) || 0;
+      result.nhej          = parseInt(refRow['Modified'])   || 0;
+
+      if (hdrRow) {
+        result.hasHDR        = true;
+        // HDR row: Unmodified = perfect HDR, Modified = imperfect HDR
+        result.hdrUnmodified = parseInt(hdrRow['Unmodified']) || 0;
+        result.hdrModified   = parseInt(hdrRow['Modified'])   || 0;
+        result.totalHDR      = result.hdrUnmodified + result.hdrModified;
+      }
+
+      // Ambiguous = reads not accounted for by any category
+      const aln = result.alignedAllAmplicons || 1;
+      result.ambiguous        = Math.max(0, aln - result.refUnmodified - result.nhej - result.totalHDR);
+
+      // All percentages use alignedAllAmplicons as denominator
+      result.refUnmodifiedPct = +((result.refUnmodified / aln) * 100).toFixed(1);
+      result.nhejPct          = +((result.nhej          / aln) * 100).toFixed(1);
+      result.hdrPct           = +((result.totalHDR      / aln) * 100).toFixed(1);
+      result.ambiguousPct     = +((result.ambiguous     / aln) * 100).toFixed(1);
+      result.alignedPct       = +((result.alignedAllAmplicons / (result.readsInInputs || 1)) * 100).toFixed(1);
     }
   } else {
     parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt not found — sample may have failed`);
@@ -1457,31 +1455,26 @@ async function parseSample(subfolder, files) {
   }
 
   // FILE 3: deletion histogram (Reference.Deletion_histogram.txt preferred, else Deletion_histogram.txt)
-  if (files.delHistFile) {
-    try {
-      const text = await readFileText(files.delHistFile);
-      const rows = parseTSV(text);
-      let fsReads = 0, inFrameReads = 0, totalDelReads = 0;
-      const largeDels = [];
-      rows.forEach(row => {
-        const delSize = parseInt(row['del_size']) || 0;
-        const fq      = parseInt(row['fq'])       || 0;
-        if (delSize === 0) return;
-        const absSize = Math.abs(delSize);
-        totalDelReads += fq;
-        if (absSize % 3 !== 0) fsReads      += fq;
-        else                   inFrameReads += fq;
-        largeDels.push({ size: absSize, fq });
-      });
-      result.hasDelHist      = true;
-      result.delFsReads      = fsReads;
-      result.delInFrameReads = inFrameReads;
-      result.delTotalReads   = totalDelReads;
-      result.delFsPct        = totalDelReads > 0 ? (fsReads / totalDelReads) * 100 : 0;
-      result.largeDels       = largeDels;
-    } catch (e) {
-      parseErrors.push(`${name}: failed to read deletion histogram — ${e.message}`);
-    }
+  if (delHistText) {
+    const rows = parseTSV(delHistText);
+    let fsReads = 0, inFrameReads = 0, totalDelReads = 0;
+    const largeDels = [];
+    rows.forEach(row => {
+      const delSize = parseInt(row['del_size']) || 0;
+      const fq      = parseInt(row['fq'])       || 0;
+      if (delSize === 0) return;
+      const absSize = Math.abs(delSize);
+      totalDelReads += fq;
+      if (absSize % 3 !== 0) fsReads      += fq;
+      else                   inFrameReads += fq;
+      largeDels.push({ size: absSize, fq });
+    });
+    result.hasDelHist      = true;
+    result.delFsReads      = fsReads;
+    result.delInFrameReads = inFrameReads;
+    result.delTotalReads   = totalDelReads;
+    result.delFsPct        = totalDelReads > 0 ? (fsReads / totalDelReads) * 100 : 0;
+    result.largeDels       = largeDels;
   }
 
   // FILE 4: alleles frequency table — always store file ref; parse only when parseKO is set
@@ -1768,9 +1761,13 @@ function onKOToggle() {
   }
 }
 
-async function runKOOnDemand() {
-  showSpinner();
-  setLoadingMsg('Running KO classification…');
+async function runKOOnDemand(showFullSpinner = true) {
+  if (showFullSpinner) {
+    showSpinner();
+    setLoadingMsg('Running KO classification…');
+    // Yield to the browser so it can paint the spinner before work begins.
+    await new Promise(r => setTimeout(r, 50));
+  }
   try {
     await Promise.all(resultsData.map(r => {
       if (r.hasAllelesData || !r.allelesFileRef) return Promise.resolve();
@@ -1784,7 +1781,6 @@ async function runKOOnDemand() {
     console.error('KO classification failed:', e);
   } finally {
     hideSpinner();
-    document.getElementById('results-loading').style.display = 'none';
     document.getElementById('results-content').style.display = 'block';
   }
 }
