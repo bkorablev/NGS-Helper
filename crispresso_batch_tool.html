@@ -34,7 +34,6 @@
     min-height: 100vh;
   }
 
-  /* Header */
   header {
     border-bottom: 1px solid var(--border);
     padding: 16px 32px;
@@ -62,7 +61,6 @@
     margin-left: 4px;
   }
 
-  /* Steps nav */
   .steps-nav {
     display: flex;
     border-bottom: 1px solid var(--border);
@@ -89,9 +87,7 @@
     border-bottom-color: var(--accent);
   }
 
-  .step-tab.done {
-    color: var(--accent2);
-  }
+  .step-tab.done { color: var(--accent2); }
 
   .step-num {
     width: 20px; height: 20px;
@@ -107,7 +103,6 @@
   .step-tab.active .step-num { background: var(--accent); color: #000; border-color: var(--accent); }
   .step-tab.done .step-num { background: var(--accent2); color: #000; border-color: var(--accent2); }
 
-  /* Main layout */
   main {
     max-width: 1100px;
     margin: 0 auto;
@@ -117,11 +112,7 @@
   .panel { display: none; }
   .panel.active { display: block; }
 
-  h2 {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 6px;
-  }
+  h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
 
   .subtitle {
     color: var(--muted);
@@ -130,7 +121,6 @@
     line-height: 1.5;
   }
 
-  /* Cards */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -149,7 +139,6 @@
     margin-bottom: 14px;
   }
 
-  /* Drop zone */
   .dropzone {
     border: 2px dashed var(--border);
     border-radius: 8px;
@@ -169,21 +158,11 @@
     position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
   }
 
-  .dropzone-icon {
-    font-size: 36px;
-    margin-bottom: 12px;
-  }
-
+  .dropzone-icon { font-size: 36px; margin-bottom: 12px; }
   .dropzone p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   .dropzone p strong { color: var(--text); }
 
-  /* File list */
-  .file-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 16px;
-  }
+  .file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
 
   .file-item {
     display: flex;
@@ -196,21 +175,14 @@
     font-size: 12px;
   }
 
-  .file-badge {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-
+  .file-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
   .badge-r1 { background: rgba(88,166,255,0.2); color: var(--accent); }
   .badge-r2 { background: rgba(63,185,80,0.2); color: var(--accent2); }
   .badge-unpaired { background: rgba(248,81,73,0.2); color: var(--error); }
 
-  /* Form elements */
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 
-  input[type=text], textarea, select {
+  input[type=text], input[type=number], textarea, select {
     width: 100%;
     background: var(--bg);
     border: 1px solid var(--border);
@@ -223,38 +195,19 @@
     outline: none;
   }
 
-  input[type=text]:focus, textarea:focus, select:focus {
+  input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus {
     border-color: var(--accent);
   }
 
   textarea { resize: vertical; min-height: 60px; }
 
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .form-group { margin-bottom: 14px; }
 
-  /* Sample table */
-  .table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  thead {
-    background: var(--surface2);
-    position: sticky;
-    top: 0;
-  }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface2); position: sticky; top: 0; }
 
   th {
     padding: 10px 12px;
@@ -269,72 +222,33 @@
     white-space: nowrap;
   }
 
-  td {
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
 
-  td input[type=text] {
-    padding: 5px 8px;
-    font-size: 12px;
-    border-color: transparent;
-    background: transparent;
-  }
+  td input[type=text] { padding: 5px 8px; font-size: 12px; border-color: transparent; background: transparent; }
+  td input[type=text]:focus { background: var(--bg); border-color: var(--accent); }
 
-  td input[type=text]:focus {
-    background: var(--bg);
-    border-color: var(--accent);
-  }
-
-  .sample-name-cell {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-    min-width: 160px;
-  }
-
+  .sample-name-cell { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 160px; }
   .label-cell { min-width: 180px; }
-  .label-cell input {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-    min-width: 180px;
-  }
-
+  .label-cell input { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 180px; }
   .seq-cell input { min-width: 200px; font-size: 11px; }
 
   .fill-wrap { position: relative; display: flex; align-items: center; }
 
   .fill-btn {
-    position: absolute;
-    right: 2px;
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 11px;
-    padding: 1px 3px;
-    opacity: 0;
-    transition: opacity 0.15s;
-    border-radius: 3px;
-    line-height: 1;
+    position: absolute; right: 2px;
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 11px; padding: 1px 3px; opacity: 0; transition: opacity 0.15s;
+    border-radius: 3px; line-height: 1;
   }
 
   td:hover .fill-btn { opacity: 1; }
   .fill-btn:hover { background: rgba(63,185,80,0.2); color: var(--accent2); }
 
   .delete-btn {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 15px;
-    padding: 2px 6px;
-    border-radius: 3px;
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 15px; padding: 2px 6px; border-radius: 3px;
   }
   .delete-btn:hover { background: rgba(248,81,73,0.15); color: var(--error); }
   .delete-btn:disabled { opacity: 0.15; cursor: not-allowed; }
@@ -345,250 +259,138 @@
   }
   .fill-flash { animation: fillFlash 0.6s ease-out; }
 
-  /* Toggle switch */
   .toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 36px;
-    height: 20px;
-    cursor: pointer;
-    flex-shrink: 0;
+    position: relative; display: inline-block; width: 36px; height: 20px;
+    cursor: pointer; flex-shrink: 0;
   }
   .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
   .toggle-slider {
-    position: absolute;
-    inset: 0;
-    background: var(--border);
-    border-radius: 20px;
-    transition: background 0.2s;
+    position: absolute; inset: 0; background: var(--border);
+    border-radius: 20px; transition: background 0.2s;
   }
   .toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    left: 3px;
-    top: 3px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform 0.2s;
+    content: ''; position: absolute; width: 14px; height: 14px;
+    left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s;
   }
   .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
   .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
 
-  /* KO column visibility */
   .ko-col.ko-hidden { display: none; }
 
-  /* Loading spinner */
   #results-loading {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 48px 0;
-    gap: 16px;
-    opacity: 1;
-    transition: opacity 0.3s ease;
+    display: none; flex-direction: column; align-items: center;
+    justify-content: center; padding: 48px 0; gap: 16px;
+    opacity: 1; transition: opacity 0.3s ease;
   }
   #results-loading.fade-out { opacity: 0; }
+
   .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    width: 40px; height: 40px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #results-loading-msg {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--muted);
-  }
 
-  /* Validation */
-  .validation-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+  #results-loading-msg { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+  .validation-list { display: flex; flex-direction: column; gap: 8px; }
 
   .val-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: 6px;
-    font-size: 13px;
-    line-height: 1.4;
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 14px; border-radius: 6px; font-size: 13px; line-height: 1.4;
   }
 
-  .val-ok { background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); }
-  .val-warn { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); }
-  .val-err { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); }
+  .val-ok  { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3); }
+  .val-warn{ background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); }
+  .val-err { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3); }
 
   .val-icon { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
 
-  /* Buttons */
   .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 9px 18px;
-    border-radius: 6px;
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 6px; font-family: var(--sans);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.15s;
   }
 
-  .btn-primary {
-    background: var(--accent);
-    color: #000;
-    border-color: var(--accent);
-  }
+  .btn-primary   { background: var(--accent);  color: #000; border-color: var(--accent); }
   .btn-primary:hover { background: #79baff; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .btn-secondary {
-    background: var(--surface2);
-    color: var(--text);
-    border-color: var(--border);
-  }
+  .btn-secondary { background: var(--surface2); color: var(--text); border-color: var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-  .btn-success {
-    background: var(--accent2);
-    color: #000;
-    border-color: var(--accent2);
-  }
+  .btn-success   { background: var(--accent2); color: #000; border-color: var(--accent2); }
   .btn-success:hover { background: #56d364; }
 
-  .btn-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-    align-items: center;
-  }
+  .btn-row { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
 
-  /* Output */
   .output-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: pre;
-    overflow-x: auto;
-    color: var(--accent2);
-    max-height: 300px;
-    overflow-y: auto;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6;
+    white-space: pre; overflow-x: auto; color: var(--accent2);
+    max-height: 300px; overflow-y: auto;
   }
 
   .cmd-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--text);
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6;
+    color: var(--text); display: flex; align-items: flex-start; gap: 12px;
   }
 
   .cmd-box span { color: var(--accent2); flex-shrink: 0; }
 
-  /* Tags / chips */
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: var(--mono);
-    background: rgba(88,166,255,0.15);
-    color: var(--accent);
-    margin: 2px;
-  }
-
-  /* Stats bar */
   .stats-bar {
-    display: flex;
-    gap: 20px;
-    padding: 12px 16px;
-    background: var(--surface2);
-    border-radius: 8px;
-    margin-bottom: 16px;
+    display: flex; gap: 20px; padding: 12px 16px;
+    background: var(--surface2); border-radius: 8px; margin-bottom: 16px;
   }
 
   .stat { text-align: center; }
   .stat-val { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--accent); }
   .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
-  /* Range / number */
-  .inline-row {
-    display: flex; align-items: center; gap: 10px;
-    flex-wrap: wrap;
-  }
-
+  .inline-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .inline-row input[type=text] { width: auto; }
 
-  /* Tooltip */
   [data-tip] { position: relative; cursor: help; }
   [data-tip]:hover::after {
     content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%; transform: translateX(-50%);
-    background: #000;
-    color: var(--text);
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 6px;
-    white-space: nowrap;
-    border: 1px solid var(--border);
-    z-index: 100;
-    font-family: var(--sans);
-    pointer-events: none;
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: #000; color: var(--text); font-size: 12px; padding: 6px 10px;
+    border-radius: 6px; white-space: nowrap; border: 1px solid var(--border);
+    z-index: 100; font-family: var(--sans); pointer-events: none;
   }
 
-  .section-divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 20px 0;
-  }
-
-  .helper-text {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 4px;
-    font-family: var(--mono);
-  }
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .helper-text { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
 
   .paste-hint {
-    font-size: 12px;
-    color: var(--warn);
-    margin-bottom: 10px;
-    padding: 8px 12px;
-    background: rgba(210,153,34,0.1);
-    border-radius: 6px;
-    border: 1px solid rgba(210,153,34,0.3);
+    font-size: 12px; color: var(--warn); margin-bottom: 10px;
+    padding: 8px 12px; background: rgba(210,153,34,0.1);
+    border-radius: 6px; border: 1px solid rgba(210,153,34,0.3);
   }
 
-  .empty-state {
-    text-align: center;
-    padding: 48px;
-    color: var(--muted);
-  }
-
+  .empty-state { text-align: center; padding: 48px; color: var(--muted); }
   .empty-state .big { font-size: 40px; margin-bottom: 12px; }
+
+  /* Auto-load banner */
+  #autoload-banner {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: rgba(88,166,255,0.08);
+    border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  #autoload-banner .spinner {
+    width: 18px; height: 18px;
+    border-width: 2px;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -621,7 +423,7 @@
 
 <main>
 
-<!-- STEP 1: Load FASTQs -->
+<!-- STEP 1 -->
 <div class="panel active" id="panel-1">
   <h2>Load FASTQ Files</h2>
   <p class="subtitle">Select your paired-end FASTQ files. R1/R2 pairs are auto-detected from Illumina naming (<code style="color:var(--accent)">_R1_001</code> / <code style="color:var(--accent)">_R2_001</code>).</p>
@@ -644,7 +446,7 @@
   </div>
 </div>
 
-<!-- STEP 2: Edit Samples -->
+<!-- STEP 2 -->
 <div class="panel" id="panel-2">
   <h2>Sample Sequences</h2>
   <p class="subtitle">Fill in amplicon and guide sequences for each detected sample. You can paste a column from Excel into any field.</p>
@@ -661,7 +463,7 @@
   </div>
 </div>
 
-<!-- STEP 3: Global Parameters -->
+<!-- STEP 3 -->
 <div class="panel" id="panel-3">
   <h2>Global Parameters</h2>
   <p class="subtitle">These settings apply to all samples. They map directly to CRISPRessoBatch flags.</p>
@@ -705,7 +507,7 @@
   </div>
 </div>
 
-<!-- STEP 4: Validate -->
+<!-- STEP 4 -->
 <div class="panel" id="panel-4">
   <h2>Validation Report</h2>
   <p class="subtitle">Check all issues before generating your .batch file.</p>
@@ -720,7 +522,7 @@
   </div>
 </div>
 
-<!-- STEP 5: Export -->
+<!-- STEP 5 -->
 <div class="panel" id="panel-5">
   <h2>Export</h2>
   <p class="subtitle">Your .batch file is ready. Download it and run CRISPRessoBatch from the same directory as your FASTQs.</p>
@@ -753,6 +555,12 @@
   <h2>Results Aggregator</h2>
   <p class="subtitle">Select your CRISPRessoBatch output folder to summarise editing efficiency across all samples. In Chrome, selecting the folder will include all subfolders automatically.</p>
 
+  <!-- Auto-load banner (shown when ?results= param is present) -->
+  <div id="autoload-banner">
+    <div class="spinner"></div>
+    <span id="autoload-msg">Looking for results folder…</span>
+  </div>
+
   <div class="card">
     <div class="card-title">Output Folder</div>
     <div class="inline-row" style="align-items:center">
@@ -783,7 +591,7 @@
         <div class="form-group">
           <label>In-frame deletion override (bp)</label>
           <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
-          <div class="helper-text">In-frame deletions ≥ this size are reclassified as likely disruptive — they may span an exon-intron boundary and still cause KO</div>
+          <div class="helper-text">In-frame deletions ≥ this size reclassified as likely disruptive</div>
         </div>
       </div>
     </div>
@@ -831,7 +639,7 @@
 
 <script>
 // ─── State ────────────────────────────────────────────────────────────────────
-let samples = []; // [{name, r1, r2, amplicon, guide, hdr_seq, hdr_name, coding}]
+let samples = [];
 let currentStep = 1;
 let validationPassed = false;
 
@@ -845,6 +653,57 @@ function goStep(n) {
   currentStep = n;
 }
 
+// ─── URL param auto-load ──────────────────────────────────────────────────────
+// Reads ?results=/path/to/folder and auto-navigates to Step 6 with a banner.
+// Because browsers cannot read arbitrary local paths via JS, we can't auto-load
+// the folder silently — the File System Access API or webkitdirectory both require
+// a user gesture. So instead we:
+//   1. Switch to Step 6 automatically
+//   2. Show a prominent banner with the exact path
+//   3. Pre-populate the folder label so the user sees the expected path
+// This is the most useful UX possible within browser security constraints.
+// When opened by Claude via `open "file:///.../tool.html?results=/path"`, the user
+// just needs to click "Browse folder" once and navigate to the shown path.
+//
+// ENHANCED: If the browser supports the File System Access API (showDirectoryPicker),
+// we attempt to show the native picker pre-annotated with the path hint.
+
+function handleURLParams() {
+  const params = new URLSearchParams(window.location.search);
+  const resultsPath = params.get('results');
+  if (!resultsPath) return;
+
+  // Navigate to Results tab
+  goStep(6);
+
+  // Show autoload banner
+  const banner = document.getElementById('autoload-banner');
+  const msg    = document.getElementById('autoload-msg');
+  banner.style.display = 'flex';
+
+  const folderName = resultsPath.split('/').filter(Boolean).pop() || resultsPath;
+  document.getElementById('results-folder-label').textContent = resultsPath;
+
+  msg.innerHTML = `Results path: <strong style="color:var(--text)">${resultsPath}</strong>
+    &nbsp;—&nbsp; click <strong>Browse folder…</strong> above and navigate to this folder.`;
+
+  // Also pre-fill the KO ploidy / other params if provided
+  const ploidy = params.get('ploidy');
+  if (ploidy) {
+    document.getElementById('ko-ploidy').value = ploidy;
+    document.getElementById('ko-enabled').checked = true;
+    document.getElementById('ko-settings-body').style.display = '';
+  }
+
+  const batchName = params.get('name');
+  if (batchName) {
+    document.getElementById('param-name').value = batchName;
+  }
+}
+
+// Run on load
+window.addEventListener('DOMContentLoaded', handleURLParams);
+
 // ─── File handling ────────────────────────────────────────────────────────────
 function handleFiles(files) {
   const fileArr = Array.from(files);
@@ -854,7 +713,6 @@ function handleFiles(files) {
   const r1Files = fileArr.filter(f => r1Pattern.test(f.name));
   const r2Files = fileArr.filter(f => r2Pattern.test(f.name));
 
-  // Build pair map by sample key (everything before _R1_)
   const pairs = {};
   r1Files.forEach(f => {
     const key = f.name.replace(/_R1_\d+\.(fastq|fq)(\.gz)?$/i, '');
@@ -868,10 +726,8 @@ function handleFiles(files) {
     pairs[key].r2 = f.name;
   });
 
-  // Also catch unpaired
   const unmatched = fileArr.filter(f => !r1Pattern.test(f.name) && !r2Pattern.test(f.name));
 
-  // Build samples from pairs
   samples = Object.entries(pairs).map(([key, val]) => ({
     name: val.sampleName || key,
     label: val.sampleName || key,
@@ -891,13 +747,13 @@ function handleFiles(files) {
 }
 
 function renderFileList(pairs, unmatched) {
-  const wrap = document.getElementById('file-list-wrap');
-  const list = document.getElementById('file-list');
+  const wrap     = document.getElementById('file-list-wrap');
+  const list     = document.getElementById('file-list');
   const statsBar = document.getElementById('stats-bar');
   wrap.style.display = 'block';
 
   const totalPairs = Object.values(pairs).filter(p => p.r1 && p.r2).length;
-  const orphaned = Object.values(pairs).filter(p => !p.r1 || !p.r2).length + unmatched.length;
+  const orphaned   = Object.values(pairs).filter(p => !p.r1 || !p.r2).length + unmatched.length;
 
   statsBar.innerHTML = `
     <div class="stat"><div class="stat-val">${Object.keys(pairs).length}</div><div class="stat-label">Samples detected</div></div>
@@ -936,10 +792,8 @@ function clearFiles() {
   renderSampleTable();
 }
 
-// Drag and drop
 const dz = document.getElementById('dropzone');
-
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragover'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
 dz.addEventListener('drop', e => {
   e.preventDefault();
@@ -949,8 +803,8 @@ dz.addEventListener('drop', e => {
 
 // ─── Sample table ─────────────────────────────────────────────────────────────
 function updateSample(el, field) {
-  const i = parseInt(el.dataset.row);
-  let val = el.value;
+  const i   = parseInt(el.dataset.row);
+  let   val = el.value;
   const isSeq = field === 'amplicon' || field === 'guide' || field === 'hdr';
   if (isSeq) { val = val.toUpperCase().replace(/[^ATCGN]/gi, ''); el.value = val; }
   if      (field === 'label')    samples[i].label    = val;
@@ -971,28 +825,20 @@ function deleteSample(delBtn) {
   const i = parseInt(delBtn.dataset.row);
   delBtn.closest('tr').remove();
   samples.splice(i, 1);
-
-  // Re-index data-row on all surviving rows
   const tbody = document.querySelector('#sample-table-wrap tbody');
   tbody.querySelectorAll('tr').forEach((tr, newIdx) => {
     tr.querySelectorAll('[data-row]').forEach(el => { el.dataset.row = newIdx; });
   });
-
-  // Hide fill-down buttons on the new last row
   const lastIdx = samples.length - 1;
   tbody.querySelectorAll('.fill-btn').forEach(fb => {
     fb.style.display = parseInt(fb.dataset.row) >= lastIdx ? 'none' : '';
   });
-
-  // Disable delete buttons if only 1 sample remains
-  tbody.querySelectorAll('.delete-btn').forEach(db => {
-    db.disabled = samples.length <= 1;
-  });
+  tbody.querySelectorAll('.delete-btn').forEach(db => { db.disabled = samples.length <= 1; });
 }
 
 function fillDown(row, col) {
-  const src = document.querySelector(`input[data-row="${row}"][data-col="${col}"]`);
-  let value = src.value;
+  const src   = document.querySelector(`input[data-row="${row}"][data-col="${col}"]`);
+  let   value = src.value;
   const isSeq = col === 'amplicon' || col === 'guide' || col === 'hdr';
   if (isSeq) value = value.toUpperCase().replace(/[^ATCGN]/gi, '');
 
@@ -1002,7 +848,6 @@ function fillDown(row, col) {
     else if (col === 'hdr')      samples[j].hdr_seq  = value;
     else if (col === 'name')     samples[j].name     = value;
     else if (col === 'label')    samples[j].label    = value;
-
     const target = document.querySelector(`input[data-row="${j}"][data-col="${col}"]`);
     if (target) {
       target.value = value;
@@ -1035,7 +880,9 @@ function renderSampleTable() {
   const single = samples.length === 1;
   samples.forEach((s, i) => {
     const notLast = i < samples.length - 1;
-    const fb = col => notLast ? `<button class="fill-btn" data-row="${i}" data-col="${col}" onclick="fillDown(+this.dataset.row,this.dataset.col)" title="Fill down">↓</button>` : '';
+    const fb = col => notLast
+      ? `<button class="fill-btn" data-row="${i}" data-col="${col}" onclick="fillDown(+this.dataset.row,this.dataset.col)" title="Fill down">↓</button>`
+      : '';
     html += `<tr>
       <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${i+1}</td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${s.label}</td>
@@ -1069,11 +916,10 @@ function renderSampleTable() {
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 function runValidation() {
-  const list = document.getElementById('validation-list');
+  const list   = document.getElementById('validation-list');
   const checks = [];
-  let errors = 0;
+  let errors   = 0;
 
-  // Check 1: samples exist
   if (!samples.length) {
     checks.push({ type: 'err', msg: 'No samples loaded. Go back to Step 1.' });
     errors++;
@@ -1081,7 +927,6 @@ function runValidation() {
     checks.push({ type: 'ok', msg: `${samples.length} sample(s) loaded.` });
   }
 
-  // Check 2: all pairs complete
   const missingR2 = samples.filter(s => !s.r2);
   if (missingR2.length) {
     checks.push({ type: 'err', msg: `${missingR2.length} sample(s) missing R2 file: ${missingR2.map(s=>s.name).join(', ')}` });
@@ -1090,7 +935,6 @@ function runValidation() {
     checks.push({ type: 'ok', msg: 'All samples have R1 + R2 pairs.' });
   }
 
-  // Check 3: amplicon sequences
   const missingAmp = samples.filter(s => !s.amplicon);
   if (missingAmp.length) {
     checks.push({ type: 'err', msg: `${missingAmp.length} sample(s) missing amplicon sequence: ${missingAmp.map(s=>s.name).join(', ')}` });
@@ -1099,7 +943,6 @@ function runValidation() {
     checks.push({ type: 'ok', msg: 'All samples have amplicon sequences.' });
   }
 
-  // Check 4: guide sequences
   const missingGuide = samples.filter(s => !s.guide);
   if (missingGuide.length) {
     checks.push({ type: 'warn', msg: `${missingGuide.length} sample(s) missing guide RNA: ${missingGuide.map(s=>s.name).join(', ')}. CRISPResso will run without guide-based quantification.` });
@@ -1107,9 +950,12 @@ function runValidation() {
     checks.push({ type: 'ok', msg: 'All samples have guide RNA sequences.' });
   }
 
-  // Check 5: guide within amplicon
   if (samples.length) {
-    const guideNotInAmp = samples.filter(s => s.guide && s.amplicon && !s.amplicon.includes(s.guide) && !revComp(s.amplicon).includes(s.guide));
+    const guideNotInAmp = samples.filter(s =>
+      s.guide && s.amplicon &&
+      !s.amplicon.includes(s.guide) &&
+      !revComp(s.amplicon).includes(s.guide)
+    );
     if (guideNotInAmp.length) {
       checks.push({ type: 'err', msg: `Guide not found in amplicon (fwd or rev) for: ${guideNotInAmp.map(s=>s.name).join(', ')}. Check sequences.` });
       errors++;
@@ -1118,27 +964,20 @@ function runValidation() {
     }
   }
 
-  // Check 6: sequence length sanity
   const shortAmp = samples.filter(s => s.amplicon && s.amplicon.length < 50);
-  if (shortAmp.length) {
-    checks.push({ type: 'warn', msg: `${shortAmp.length} amplicon(s) seem very short (<50bp): ${shortAmp.map(s=>s.name).join(', ')}` });
-  }
+  if (shortAmp.length) checks.push({ type: 'warn', msg: `${shortAmp.length} amplicon(s) seem very short (<50bp): ${shortAmp.map(s=>s.name).join(', ')}` });
 
   const shortGuide = samples.filter(s => s.guide && (s.guide.length < 17 || s.guide.length > 23));
-  if (shortGuide.length) {
-    checks.push({ type: 'warn', msg: `${shortGuide.length} guide(s) have unusual length (expected 17-23bp): ${shortGuide.map(s=>s.name).join(', ')}` });
-  }
+  if (shortGuide.length) checks.push({ type: 'warn', msg: `${shortGuide.length} guide(s) have unusual length (expected 17-23bp): ${shortGuide.map(s=>s.name).join(', ')}` });
 
-  // Check 7: empty labels
   const emptyLabel = samples.filter(s => !s.label || !s.label.trim());
   if (emptyLabel.length) {
-    checks.push({ type: 'err', msg: `${emptyLabel.length} sample(s) have an empty label. Each sample must have a unique label.` });
+    checks.push({ type: 'err', msg: `${emptyLabel.length} sample(s) have an empty label.` });
     errors++;
   }
 
-  // Check 8: duplicate labels
   const labels = samples.map(s => s.label);
-  const dupes = labels.filter((n, i) => labels.indexOf(n) !== i);
+  const dupes  = labels.filter((n, i) => labels.indexOf(n) !== i);
   if (dupes.length) {
     checks.push({ type: 'err', msg: `Duplicate sample labels: ${[...new Set(dupes)].join(', ')}` });
     errors++;
@@ -1162,7 +1001,6 @@ function revComp(seq) {
 
 // ─── Build export ─────────────────────────────────────────────────────────────
 function buildExport() {
-  // Header row
   const cols = ['name', 'fastq_r1', 'fastq_r2', 'amplicon_seq', 'guide_seq'];
   const hasHDR = samples.some(s => s.hdr_seq);
   if (hasHDR) cols.push('expected_hdr_amplicon_seq');
@@ -1174,78 +1012,70 @@ function buildExport() {
     rows.push(row.join('\t'));
   });
 
-  const batchContent = rows.join('\n');
-  document.getElementById('batch-preview').textContent = batchContent;
+  document.getElementById('batch-preview').textContent = rows.join('\n');
 
   const batchNameVal = document.getElementById('param-name').value.trim();
-  const batchName = (batchNameVal || 'batch') + '.batch';
-  const qw = document.getElementById('param-qw').value.trim();
-  const minfreq = document.getElementById('param-minfreq').value.trim();
-  const extra = document.getElementById('param-extra').value.trim();
+  const batchName    = (batchNameVal || 'batch') + '.batch';
+  const qw           = document.getElementById('param-qw').value.trim();
+  const minfreq      = document.getElementById('param-minfreq').value.trim();
+  const extra        = document.getElementById('param-extra').value.trim();
 
   let cmd = `CRISPRessoBatch --batch_settings ${batchName}`;
-  if (qw && qw !== '1') cmd += ` --quantification_window_size ${qw}`;
+  if (qw && qw !== '1')           cmd += ` --quantification_window_size ${qw}`;
   if (minfreq && minfreq !== '0.2') cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
-  if (extra) cmd += ` ${extra}`;
+  if (extra)                       cmd += ` ${extra}`;
 
   document.getElementById('run-cmd').textContent = cmd;
 }
 
 function downloadBatch() {
   const batchName = (document.getElementById('param-name').value.trim() || 'batch') + '.batch';
-  const content = document.getElementById('batch-preview').textContent;
-  const blob = new Blob([content], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = batchName;
+  const content   = document.getElementById('batch-preview').textContent;
+  const a         = document.createElement('a');
+  a.href          = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+  a.download      = batchName;
   a.click();
 }
 
 function downloadBatchXlsx() {
   const batchNameVal = document.getElementById('param-name').value.trim() || 'batch';
   const hasHDR = samples.some(s => s.hdr_seq);
-  const cols = ['name', 'fastq_r1', 'fastq_r2', 'amplicon_seq', 'guide_seq'];
+  const cols   = ['name','fastq_r1','fastq_r2','amplicon_seq','guide_seq'];
   if (hasHDR) cols.push('expected_hdr_amplicon_seq');
-  const rows = [cols];
-  samples.forEach(s => {
-    rows.push(cols.map(c => {
-      if (c === 'name') return s.label || '';
-      if (c === 'fastq_r1') return s.r1 || '';
-      if (c === 'fastq_r2') return s.r2 || '';
-      if (c === 'amplicon_seq') return s.amplicon || '';
-      if (c === 'guide_seq') return s.guide || '';
-      if (c === 'expected_hdr_amplicon_seq') return s.hdr_seq || '';
-    }));
-  });
+  const rows = [cols, ...samples.map(s => cols.map(c => {
+    if (c==='name') return s.label||'';
+    if (c==='fastq_r1') return s.r1||'';
+    if (c==='fastq_r2') return s.r2||'';
+    if (c==='amplicon_seq') return s.amplicon||'';
+    if (c==='guide_seq') return s.guide||'';
+    if (c==='expected_hdr_amplicon_seq') return s.hdr_seq||'';
+  }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'batch');
   XLSX.writeFile(wb, batchNameVal + '.xlsx');
 }
 
 function copyCmd() {
-  const cmd = document.getElementById('run-cmd').textContent;
-  navigator.clipboard.writeText(cmd);
-  const confirm = document.getElementById('copy-confirm');
-  confirm.style.display = 'block';
-  setTimeout(() => confirm.style.display = 'none', 2000);
+  navigator.clipboard.writeText(document.getElementById('run-cmd').textContent);
+  const c = document.getElementById('copy-confirm');
+  c.style.display = 'block';
+  setTimeout(() => c.style.display = 'none', 2000);
 }
 
 // ─── Results aggregator ───────────────────────────────────────────────────────
-let resultsData = [];
+let resultsData        = [];
 let resultsLoadedWithKO = false;
-const parseErrors = [];
+const parseErrors      = [];
 
-function setLoadingMsg(msg) {
-  document.getElementById('results-loading-msg').textContent = msg;
-}
+function setLoadingMsg(msg) { document.getElementById('results-loading-msg').textContent = msg; }
 
 function showSpinner() {
   const el = document.getElementById('results-loading');
   el.classList.remove('fade-out');
   el.style.display = 'flex';
   document.getElementById('results-content').style.display = 'none';
-  document.getElementById('results-empty').style.display  = 'none';
-  document.getElementById('results-errors').style.display = 'none';
+  document.getElementById('results-empty').style.display   = 'none';
+  document.getElementById('results-errors').style.display  = 'none';
 }
 
 function hideSpinner() {
@@ -1261,21 +1091,20 @@ function loadResults(files) {
   if (fileArr.length) {
     const topFolder = fileArr[0].webkitRelativePath.split('/')[0];
     document.getElementById('results-folder-label').textContent = topFolder;
+    // Hide the autoload banner once a real folder is selected
+    document.getElementById('autoload-banner').style.display = 'none';
   }
 
   showSpinner();
   setLoadingMsg('Reading files…');
 
-  // Group files by CRISPResso_on_<sample> subfolder.
-  // Use the full path up to (and including) that folder as the key so that
-  // samples with identical folder names under different parents stay separate.
   const groups = {};
   fileArr.forEach(f => {
-    const parts   = f.webkitRelativePath.split('/');
-    const subIdx  = parts.findIndex(p => /^CRISPResso_on_/i.test(p));
+    const parts  = f.webkitRelativePath.split('/');
+    const subIdx = parts.findIndex(p => /^CRISPResso_on_/i.test(p));
     if (subIdx === -1) return;
-    const subKey  = parts.slice(0, subIdx + 1).join('/'); // unique per-sample path key
-    const subName = parts[subIdx];                        // CRISPResso_on_<sample> folder name
+    const subKey  = parts.slice(0, subIdx + 1).join('/');
+    const subName = parts[subIdx];
     const fname   = parts[parts.length - 1];
     const isQuant      = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
     const isMap        = fname === 'CRISPResso_mapping_statistics.txt';
@@ -1285,25 +1114,22 @@ function loadResults(files) {
     const isAlleles    = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
     if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefAlleles && !isAlleles) return;
     if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null };
-    if (isQuant)           groups[subKey].quantFile   = f;
-    else if (isMap)        groups[subKey].mapFile     = f;
-    else if (isRefHist)    groups[subKey].delHistFile = f;
+    if (isQuant)                                    groups[subKey].quantFile   = f;
+    else if (isMap)                                 groups[subKey].mapFile     = f;
+    else if (isRefHist)                             groups[subKey].delHistFile = f;
     else if (isDelHist && !groups[subKey].delHistFile) groups[subKey].delHistFile = f;
-    else if (isRefAlleles) groups[subKey].allelesFile = f;           // preferred (.txt or .zip)
-    else if (isAlleles && !groups[subKey].allelesFile) groups[subKey].allelesFile = f; // fallback
+    else if (isRefAlleles)                          groups[subKey].allelesFile = f;
+    else if (isAlleles && !groups[subKey].allelesFile) groups[subKey].allelesFile = f;
   });
 
   const subfolders = Object.keys(groups).sort();
-
   if (!subfolders.length) {
     hideSpinner();
     document.getElementById('results-empty').style.display = 'block';
     return;
   }
 
-  // Phase 1 always skips alleles — zip unzipping happens in Phase 2 only.
   resultsLoadedWithKO = false;
-
   let parsed = 0;
   const total = subfolders.length;
   setLoadingMsg(`Parsing sample 1 of ${total}…`);
@@ -1326,75 +1152,63 @@ function loadResults(files) {
     renderKOSummaryBar();
     hideSpinner();
     document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
-    // Phase 2: unzip alleles and run KO classification in the background if enabled.
     if (koEnabled() && resultsData.length) runKOOnDemand(false);
-  }).catch(() => {
-    hideSpinner();
-  });
+  }).catch(() => hideSpinner());
 }
 
 function readFileText(file) {
   return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = e => resolve(e.target.result);
-    r.onerror = () => reject(new Error('FileReader error'));
+    const r    = new FileReader();
+    r.onload   = e => resolve(e.target.result);
+    r.onerror  = () => reject(new Error('FileReader error'));
     r.readAsText(file);
   });
 }
 
-// Read an alleles frequency file — handles both plain .txt and .zip
 async function readAllelesText(file) {
   if (!file.name.endsWith('.zip')) return readFileText(file);
   const buf = await new Promise((resolve, reject) => {
-    const r = new FileReader();
+    const r   = new FileReader();
     r.onload  = e => resolve(e.target.result);
     r.onerror = () => reject(new Error('FileReader error'));
     r.readAsArrayBuffer(file);
   });
-  const zip = await JSZip.loadAsync(buf);
+  const zip     = await JSZip.loadAsync(buf);
   const txtName = Object.keys(zip.files).find(n => n.endsWith('.txt') && !zip.files[n].dir);
   if (!txtName) throw new Error('no .txt file found inside zip');
   return zip.files[txtName].async('string');
 }
 
-// Parse a TSV string into an array of objects keyed by header
 function parseTSV(text) {
   const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length);
   if (lines.length < 2) return [];
   const headers = lines[0].split('\t');
   return lines.slice(1).map(line => {
     const vals = line.split('\t');
-    const obj = {};
+    const obj  = {};
     headers.forEach((h, i) => { obj[h.trim()] = (vals[i] || '').trim(); });
     return obj;
   });
 }
 
 async function parseSample(subfolder, files) {
-  const name = subfolder.replace(/^CRISPResso_on_/i, '');
+  const name   = subfolder.replace(/^CRISPResso_on_/i, '');
   const result = {
     name, failed: false,
     readsInInputs: 0, alignedAllAmplicons: 0,
-    // Reference row
     refUnmodified: 0, nhej: 0,
-    // HDR row (only when HDR template was used)
     hasHDR: false, hdrUnmodified: 0, hdrModified: 0, totalHDR: 0,
-    // Ambiguous = aligned - refUnmodified - nhej - totalHDR
     ambiguous: 0,
-    // Calculated percentages (denominator = alignedAllAmplicons)
-    refUnmodifiedPct: 0, nhejPct: 0, hdrPct: 0, ambiguousPct: 0,
-    alignedPct: 0,
-    // Deletion histogram
+    refUnmodifiedPct: 0, nhejPct: 0, hdrPct: 0, ambiguousPct: 0, alignedPct: 0,
     hasDelHist: false, delFsReads: 0, delInFrameReads: 0,
     delTotalReads: 0, delFsPct: 0, largeDels: [],
-    // Alleles frequency table — [{nDel, nIns, nMut, freq, readStatus}] sorted by freq desc
     hasAllelesData: false, topAlleles: []
   };
 
-  // Read the three text files in parallel — each resolves to text or null on error.
   const safeRead = (file, label) =>
-    file ? readFileText(file).catch(e => { parseErrors.push(`${name}: failed to read ${label} — ${e.message}`); return null; })
-         : Promise.resolve(null);
+    file ? readFileText(file).catch(e => {
+      parseErrors.push(`${name}: failed to read ${label} — ${e.message}`); return null;
+    }) : Promise.resolve(null);
 
   const [mapText, quantText, delHistText] = await Promise.all([
     safeRead(files.mapFile,     'CRISPResso_mapping_statistics.txt'),
@@ -1402,47 +1216,34 @@ async function parseSample(subfolder, files) {
     safeRead(files.delHistFile, 'deletion histogram'),
   ]);
 
-  // FILE 2: mapping statistics
   if (mapText) {
     const rows = parseTSV(mapText);
     if (rows.length) {
-      const row = rows[0];
-      result.readsInInputs       = parseInt(row['READS IN INPUTS']) || 0;
-      result.alignedAllAmplicons = parseInt(row['READS ALIGNED'])   || 0;
+      result.readsInInputs       = parseInt(rows[0]['READS IN INPUTS']) || 0;
+      result.alignedAllAmplicons = parseInt(rows[0]['READS ALIGNED'])   || 0;
     }
   }
 
-  // FILE 1: quantification of editing frequency
   if (quantText) {
     const rows = parseTSV(quantText);
     if (!rows.length) {
-      parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt has no data rows`);
+      parseErrors.push(`${name}: quantification file has no data rows`);
       result.failed = true;
     } else {
       const refRow = rows.find(r => r['Amplicon'] === 'Reference') || rows[0];
       const hdrRow = rows.find(r => r['Amplicon'] === 'HDR');
-
-      // Prefer quant file values for totals (authoritative)
       result.readsInInputs       = parseInt(refRow['Reads_in_input'])              || result.readsInInputs;
       result.alignedAllAmplicons = parseInt(refRow['Reads_aligned_all_amplicons']) || result.alignedAllAmplicons;
-
-      // Reference row: Unmodified = unedited reads, Modified = NHEJ reads
-      result.refUnmodified = parseInt(refRow['Unmodified']) || 0;
-      result.nhej          = parseInt(refRow['Modified'])   || 0;
-
+      result.refUnmodified       = parseInt(refRow['Unmodified']) || 0;
+      result.nhej                = parseInt(refRow['Modified'])   || 0;
       if (hdrRow) {
         result.hasHDR        = true;
-        // HDR row: Unmodified = perfect HDR, Modified = imperfect HDR
         result.hdrUnmodified = parseInt(hdrRow['Unmodified']) || 0;
         result.hdrModified   = parseInt(hdrRow['Modified'])   || 0;
         result.totalHDR      = result.hdrUnmodified + result.hdrModified;
       }
-
-      // Ambiguous = reads not accounted for by any category
-      const aln = result.alignedAllAmplicons || 1;
+      const aln               = result.alignedAllAmplicons || 1;
       result.ambiguous        = Math.max(0, aln - result.refUnmodified - result.nhej - result.totalHDR);
-
-      // All percentages use alignedAllAmplicons as denominator
       result.refUnmodifiedPct = +((result.refUnmodified / aln) * 100).toFixed(1);
       result.nhejPct          = +((result.nhej          / aln) * 100).toFixed(1);
       result.hdrPct           = +((result.totalHDR      / aln) * 100).toFixed(1);
@@ -1450,11 +1251,10 @@ async function parseSample(subfolder, files) {
       result.alignedPct       = +((result.alignedAllAmplicons / (result.readsInInputs || 1)) * 100).toFixed(1);
     }
   } else {
-    parseErrors.push(`${name}: CRISPResso_quantification_of_editing_frequency.txt not found — sample may have failed`);
+    parseErrors.push(`${name}: quantification file not found — sample may have failed`);
     result.failed = true;
   }
 
-  // FILE 3: deletion histogram (Reference.Deletion_histogram.txt preferred, else Deletion_histogram.txt)
   if (delHistText) {
     const rows = parseTSV(delHistText);
     let fsReads = 0, inFrameReads = 0, totalDelReads = 0;
@@ -1477,7 +1277,6 @@ async function parseSample(subfolder, files) {
     result.largeDels       = largeDels;
   }
 
-  // FILE 4: alleles frequency table — always store file ref; parse only when parseKO is set
   result.allelesFileRef = files.allelesFile || null;
   if (files.allelesFile && files.parseKO) {
     await parseAllelesIntoResult(result, files.allelesFile);
@@ -1486,11 +1285,10 @@ async function parseSample(subfolder, files) {
   return result;
 }
 
-// Parse an alleles frequency file into an existing result object (shared by parseSample + runKOOnDemand)
 async function parseAllelesIntoResult(result, file) {
   try {
-    const text = await readAllelesText(file);
-    const rows = parseTSV(text);
+    const text     = await readAllelesText(file);
+    const rows     = parseTSV(text);
     const clusters = {};
     rows.forEach(row => {
       if (row['Reference_Name'] !== 'Reference') return;
@@ -1499,7 +1297,6 @@ async function parseAllelesIntoResult(result, file) {
       const nMut       = parseInt(row['n_mutated'])  || 0;
       const freq       = parseFloat(row['%Reads'])   || 0;
       const readStatus = (row['Read_Status'] || '').trim();
-      // Separate WT (0,0,UNMODIFIED) from substitution-only (0,0,MODIFIED) clusters
       const key = (nDel === 0 && nIns === 0)
         ? `0_0_${readStatus === 'UNMODIFIED' ? 'WT' : 'SUB'}`
         : `${nDel}_${nIns}`;
@@ -1514,32 +1311,28 @@ async function parseAllelesIntoResult(result, file) {
   }
 }
 
-function pct(n, total) { return total ? ((n / total) * 100).toFixed(1) : '0.0'; }
-
 function buildKOCellHTML(r, idx) {
   const idxAttr = idx !== undefined ? ` data-sample-index="${idx}"` : '';
   if (r.failed) return `<td class="ko-col" data-ko-cell${idxAttr}></td>`;
   const { status: koStatus, warnings: koWarnings, alleles: koAlleles } = classifyKO(r);
-  const koBadge = koStatus ? koStatusBadge(koStatus) : '—';
+  const koBadge   = koStatus ? koStatusBadge(koStatus) : '—';
   const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
   const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
   const alleleRows = (koAlleles || []).map((a, i) =>
-    `<div>Allele ${i + 1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type] || '#7d8590'}">${a.type}${typeIcon[a.type] || ''} (${alleleLabel(a)})</span></div>`
+    `<div>Allele ${i+1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type]||'#7d8590'}">${a.type}${typeIcon[a.type]||''} (${alleleLabel(a)})</span></div>`
   ).join('');
   const alleleBreakdown = alleleRows
     ? `<div style="margin-top:5px;font-size:10px;font-family:var(--mono);line-height:1.8">${alleleRows}</div>` : '';
   const koWarn = koWarnings.length
-    ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>`
-    : '';
+    ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.6">${koWarnings.join('<br>')}</div>` : '';
   return `<td class="ko-col" data-ko-cell${idxAttr} style="min-width:180px">${koBadge}${alleleBreakdown}${koWarn}</td>`;
 }
 
 function renderResultsTable() {
-  const anyHDR = resultsData.some(r => r.hasHDR);
+  const anyHDR       = resultsData.some(r => r.hasHDR);
   const anyAmbiguous = anyHDR && resultsData.some(r => r.ambiguous > 0);
-  const koVisible = koEnabled() && resultsLoadedWithKO;
+  const koVisible    = koEnabled() && resultsLoadedWithKO;
   const koHiddenClass = koVisible ? '' : ' ko-hidden';
-  const NCOLS = 5 + (anyHDR ? 1 : 0) + (anyAmbiguous ? 1 : 0);
 
   let html = `<table><thead><tr>
     <th>Sample</th>
@@ -1557,7 +1350,7 @@ function renderResultsTable() {
     if (r.failed) {
       html += `<tr>
         <td style="font-family:var(--mono);color:var(--error)">${r.name}</td>
-        <td colspan="${NCOLS}" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
+        <td colspan="6" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
         <td class="ko-col${koHiddenClass}" data-sample-index="${idx}" data-ko-cell></td>
       </tr>`;
       return;
@@ -1586,36 +1379,28 @@ function renderResultsTable() {
 function updateKOCells() {
   document.querySelectorAll('[data-sample-index][data-ko-cell]').forEach(td => {
     const idx = parseInt(td.getAttribute('data-sample-index'));
-    const r = resultsData[idx];
+    const r   = resultsData[idx];
     if (!r || r.failed) return;
-    const tmp = document.createElement('table');
+    const tmp    = document.createElement('table');
     tmp.innerHTML = '<tr>' + buildKOCellHTML(r) + '</tr>';
     const parsed = tmp.querySelector('td');
-    td.innerHTML = parsed.innerHTML;
+    td.innerHTML  = parsed.innerHTML;
     td.style.cssText = parsed.getAttribute('style') || '';
   });
 }
 
-function showKOColumn() {
-  document.querySelectorAll('.ko-col').forEach(el => el.classList.remove('ko-hidden'));
-}
-
-function hideKOColumn() {
-  document.querySelectorAll('.ko-col').forEach(el => el.classList.add('ko-hidden'));
-}
+function showKOColumn() { document.querySelectorAll('.ko-col').forEach(el => el.classList.remove('ko-hidden')); }
+function hideKOColumn() { document.querySelectorAll('.ko-col').forEach(el => el.classList.add('ko-hidden')); }
 
 function renderResultsCharts() {
   const good = resultsData.filter(r => !r.failed);
   if (!good.length) { document.getElementById('results-chart-wrap').innerHTML = ''; return; }
-
   const BAR_W = 560, BAR_H = 22, LABEL_W = 190, ROW_H = 38, PAD = 10;
   let svg = `<svg width="100%" viewBox="0 0 ${LABEL_W + BAR_W} ${good.length * ROW_H + PAD}" style="display:block">`;
-
   good.forEach((r, idx) => {
-    const y = idx * ROW_H + PAD / 2;
+    const y     = idx * ROW_H + PAD / 2;
     const label = r.name.length > 24 ? r.name.slice(0, 23) + '…' : r.name;
     svg += `<text x="${LABEL_W - 8}" y="${y + BAR_H/2 + 4}" text-anchor="end" fill="#7d8590" font-size="11" font-family="IBM Plex Mono,monospace">${label}</text>`;
-
     let x = LABEL_W;
     const seg = (pctVal, fill, lbl) => {
       const w = (pctVal / 100) * BAR_W;
@@ -1624,18 +1409,17 @@ function renderResultsCharts() {
       if (w > 38) svg += `<text x="${x + w/2}" y="${y + BAR_H/2 + 4}" text-anchor="middle" fill="#fff" font-size="10" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
       x += w;
     };
-    seg(r.refUnmodifiedPct, '#7d8590', r.refUnmodifiedPct.toFixed(1) + '%');  // --muted
-    seg(r.nhejPct,          '#f85149', r.nhejPct.toFixed(1)          + '%');  // --error
-    if (r.hasHDR)         seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');  // --accent2
-    if (r.ambiguous > 0)  seg(r.ambiguousPct, '#d29922', r.ambiguousPct.toFixed(1) + '%');  // --warn
+    seg(r.refUnmodifiedPct, '#7d8590', r.refUnmodifiedPct.toFixed(1) + '%');
+    seg(r.nhejPct,          '#f85149', r.nhejPct.toFixed(1)          + '%');
+    if (r.hasHDR)        seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');
+    if (r.ambiguous > 0) seg(r.ambiguousPct, '#d29922', r.ambiguousPct.toFixed(1) + '%');
   });
-
   svg += '</svg>';
   document.getElementById('results-chart-wrap').innerHTML = svg;
 }
 
 function renderParseErrors() {
-  const el = document.getElementById('results-errors');
+  const el   = document.getElementById('results-errors');
   const list = document.getElementById('results-errors-list');
   if (!parseErrors.length) { el.style.display = 'none'; return; }
   list.innerHTML = parseErrors.map(e => `<div style="padding:4px 0;border-bottom:1px solid var(--border)">⚠ ${e}</div>`).join('');
@@ -1665,20 +1449,17 @@ function classifyKO(r) {
   const ploidy   = Math.max(1, parseInt(document.getElementById('ko-ploidy').value)    || 2);
   const largeDel = Math.max(1, parseInt(document.getElementById('ko-large-del').value) || 50);
 
-  const topN = r.topAlleles.slice(0, ploidy);
+  const topN      = r.topAlleles.slice(0, ploidy);
   const classified = topN.map(a => ({ ...a, type: classifyAllele(a, largeDel) }));
 
-  // Noise cutoff: if the top allele is Wildtype at ≥90%, minor alleles are likely
-  // sequencing noise — classify as No KO regardless of what they look like.
   if (classified.length > 0 && classified[0].type === 'Wildtype' && classified[0].freq >= 90) {
     return { status: 'No KO', warnings: [], alleles: classified };
   }
 
-  const hasWT        = classified.some(a => a.type === 'Wildtype');
-  const allStrongKO  = classified.every(a => a.type === 'Frameshift' || a.type === 'Large in-frame deletion');
-  const anyStrongKO  = classified.some(a => a.type === 'Frameshift'  || a.type === 'Large in-frame deletion');
-  const hasInFrame   = classified.some(a => a.type === 'In-frame');
-  const allInFrame   = classified.every(a => a.type === 'In-frame');
+  const hasWT       = classified.some(a => a.type === 'Wildtype');
+  const allStrongKO = classified.every(a => a.type === 'Frameshift' || a.type === 'Large in-frame deletion');
+  const anyStrongKO = classified.some(a  => a.type === 'Frameshift' || a.type === 'Large in-frame deletion');
+  const hasInFrame  = classified.some(a  => a.type === 'In-frame');
 
   let status;
   const warnings = [];
@@ -1687,10 +1468,10 @@ function classifyKO(r) {
     status = 'Full KO';
   } else if (!hasWT && anyStrongKO && hasInFrame) {
     status = 'Likely Partial KO';
-    warnings.push('All alleles edited — in-frame mutation may preserve protein function. Check if affected residues are functionally critical.');
+    warnings.push('All alleles edited — in-frame mutation may preserve protein function.');
   } else if (anyStrongKO) {
     status = 'Partial KO';
-  } else if (!hasWT && allInFrame) {
+  } else if (!hasWT && classified.every(a => a.type === 'In-frame')) {
     status = 'Unlikely KO';
   } else {
     status = 'No KO';
@@ -1701,12 +1482,12 @@ function classifyKO(r) {
 
 function koStatusBadge(status) {
   const colorMap = {
-    'Full KO':            '#3fb950',
-    'Likely Partial KO':  '#58a6ff',
-    'Partial KO':         '#d29922',
-    'Unlikely KO':        '#7d8590',
-    'No KO':              '#7d8590',
-    'Insufficient data':  '#7d8590'
+    'Full KO':           '#3fb950',
+    'Likely Partial KO': '#58a6ff',
+    'Partial KO':        '#d29922',
+    'Unlikely KO':       '#7d8590',
+    'No KO':             '#7d8590',
+    'Insufficient data': '#7d8590'
   };
   const c = colorMap[status] || '#7d8590';
   return `<span style="background:${c}22;color:${c};border:1px solid ${c}55;border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono);white-space:nowrap">${status}</span>`;
@@ -1720,12 +1501,12 @@ function renderKOSummaryBar() {
   let fullKO = 0, likelyPartialKO = 0, partialKO = 0, unlikelyKO = 0, noKO = 0, insufficient = 0;
   good.forEach(r => {
     const { status } = classifyKO(r);
-    if      (status === 'Full KO')            fullKO++;
-    else if (status === 'Likely Partial KO')  likelyPartialKO++;
-    else if (status === 'Partial KO')         partialKO++;
-    else if (status === 'Unlikely KO')        unlikelyKO++;
-    else if (status === 'No KO')              noKO++;
-    else                                      insufficient++;
+    if      (status === 'Full KO')           fullKO++;
+    else if (status === 'Likely Partial KO') likelyPartialKO++;
+    else if (status === 'Partial KO')        partialKO++;
+    else if (status === 'Unlikely KO')       unlikelyKO++;
+    else if (status === 'No KO')             noKO++;
+    else                                     insufficient++;
   });
 
   let html = `
@@ -1749,30 +1530,21 @@ function renderKOSummaryBar() {
   bar.innerHTML = html;
 }
 
-function koEnabled() {
-  return document.getElementById('ko-enabled').checked;
-}
+function koEnabled() { return document.getElementById('ko-enabled').checked; }
 
 function onKOToggle() {
   const enabled = koEnabled();
   document.getElementById('ko-settings-body').style.display = enabled ? '' : 'none';
   if (!resultsData.length) return;
-  if (enabled && !resultsLoadedWithKO) {
-    runKOOnDemand();
-  } else if (enabled) {
-    showKOColumn();
-    renderKOSummaryBar();
-  } else {
-    hideKOColumn();
-    renderKOSummaryBar();
-  }
+  if (enabled && !resultsLoadedWithKO) runKOOnDemand();
+  else if (enabled) { showKOColumn(); renderKOSummaryBar(); }
+  else              { hideKOColumn(); renderKOSummaryBar(); }
 }
 
 async function runKOOnDemand(showFullSpinner = true) {
   if (showFullSpinner) {
     showSpinner();
     setLoadingMsg('Running KO classification…');
-    // Yield to the browser so it can paint the spinner before work begins.
     await new Promise(r => setTimeout(r, 50));
   }
   try {
@@ -1799,45 +1571,43 @@ function reEvalKO() {
 }
 
 function exportResults() {
-  const wb = XLSX.utils.book_new();
-  const anyHDR = resultsData.some(r => r.hasHDR);
-
-  // Sheet 1: Summary
+  const wb          = XLSX.utils.book_new();
+  const anyHDR      = resultsData.some(r => r.hasHDR);
   const exportPloidy = Math.max(1, parseInt(document.getElementById('ko-ploidy').value) || 2);
   const alleleHeaders = [];
   for (let i = 1; i <= exportPloidy; i++) alleleHeaders.push(`Allele${i}_freq`, `Allele${i}_type`);
 
-  const summaryHeaders = ['Sample', 'Reads in Input', 'Reads Aligned', 'Aligned %',
-    'Unmodified', 'Unmodified %', 'NHEJ', 'NHEJ %',
-    ...(anyHDR ? ['HDR (Perfect+Imperfect)', 'HDR %', 'Ambiguous', 'Ambiguous %'] : []),
-    'Status', 'KO Status', 'KO Warnings', ...alleleHeaders];
+  const summaryHeaders = ['Sample','Reads in Input','Reads Aligned','Aligned %',
+    'Unmodified','Unmodified %','NHEJ','NHEJ %',
+    ...(anyHDR ? ['HDR (Perfect+Imperfect)','HDR %','Ambiguous','Ambiguous %'] : []),
+    'Status','KO Status','KO Warnings',...alleleHeaders];
+
   const summaryRows = [summaryHeaders, ...resultsData.map(r => {
-    const row = [r.name, r.readsInInputs, r.alignedAllAmplicons, r.alignedPct,
-                 r.refUnmodified, r.refUnmodifiedPct, r.nhej, r.nhejPct];
-    if (anyHDR) row.push(r.totalHDR, r.hdrPct, r.ambiguous, r.ambiguousPct);
+    const row = [r.name,r.readsInInputs,r.alignedAllAmplicons,r.alignedPct,
+                 r.refUnmodified,r.refUnmodifiedPct,r.nhej,r.nhejPct];
+    if (anyHDR) row.push(r.totalHDR,r.hdrPct,r.ambiguous,r.ambiguousPct);
     row.push(r.failed ? 'Failed' : 'OK');
     if (!r.failed) {
       const { status, warnings, alleles } = classifyKO(r);
       row.push(status || '—', warnings.join('; '));
       for (let i = 0; i < exportPloidy; i++) {
         const a = alleles && alleles[i];
-        row.push(a ? a.freq.toFixed(1) + '%' : '', a ? `${a.type} (${alleleLabel(a)})` : '');
+        row.push(a ? a.freq.toFixed(1)+'%' : '', a ? `${a.type} (${alleleLabel(a)})` : '');
       }
     } else {
-      row.push('', '');
-      for (let i = 0; i < exportPloidy; i++) row.push('', '');
+      row.push('','');
+      for (let i = 0; i < exportPloidy; i++) row.push('','');
     }
     return row;
   })];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
 
-  // Sheet 2: Raw
-  const rawHeaders = ['Sample', 'Reads_in_input', 'Reads_aligned_all_amplicons',
-    'Ref_Unmodified', 'Ref_Modified_NHEJ',
-    ...(anyHDR ? ['HDR_Unmodified', 'HDR_Modified', 'Total_HDR', 'Ambiguous'] : [])];
+  const rawHeaders = ['Sample','Reads_in_input','Reads_aligned_all_amplicons',
+    'Ref_Unmodified','Ref_Modified_NHEJ',
+    ...(anyHDR ? ['HDR_Unmodified','HDR_Modified','Total_HDR','Ambiguous'] : [])];
   const rawRows = [rawHeaders, ...resultsData.map(r => {
-    const row = [r.name, r.readsInInputs, r.alignedAllAmplicons, r.refUnmodified, r.nhej];
-    if (anyHDR) row.push(r.hdrUnmodified, r.hdrModified, r.totalHDR, r.ambiguous);
+    const row = [r.name,r.readsInInputs,r.alignedAllAmplicons,r.refUnmodified,r.nhej];
+    if (anyHDR) row.push(r.hdrUnmodified,r.hdrModified,r.totalHDR,r.ambiguous);
     return row;
   })];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rawRows), 'Raw');
