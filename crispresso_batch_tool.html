@@ -478,8 +478,6 @@
   .cmp-table td { padding: 5px 10px; border-bottom: 1px solid rgba(48,54,61,0.5); vertical-align: middle; white-space: nowrap; }
   .cmp-table tr:last-child td { border-bottom: none; }
 
-  .nhej-delta { font-size: 10px; margin-left: 4px; }
-
   /* push page content up so sticky panel doesn't obscure it */
   body.cmp-open main { padding-bottom: 280px; }
 </style>
@@ -1816,12 +1814,6 @@ function renderComparisonPanel() {
   const anyHDR = selected.some(r => r.hasHDR);
   const koVis  = koEnabled() && resultsLoadedWithKO;
 
-  // Compute group mean NHEJ % for delta labels (exclude failed samples)
-  const nhejValues = selected.filter(r => !r.failed).map(r => r.nhejPct);
-  const nhejMean   = nhejValues.length
-    ? nhejValues.reduce((a, b) => a + b, 0) / nhejValues.length
-    : 0;
-
   // Header
   let thead = `<tr>
     <th>Sample</th>
@@ -1844,10 +1836,6 @@ function renderComparisonPanel() {
       return;
     }
 
-    const delta    = r.nhejPct - nhejMean;
-    const deltaStr = nhejValues.length < 2 ? '' :
-      `<span class="nhej-delta" style="color:${delta >= 0 ? 'var(--accent2)' : 'var(--error)'}">(${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%)</span>`;
-
     let koCell = '';
     if (koVis) {
       const { status } = classifyKO(r);
@@ -1858,8 +1846,8 @@ function renderComparisonPanel() {
       <td style="color:var(--accent)">${r.name}</td>
       <td>${r.alignedPct}%</td>
       <td>${r.refUnmodifiedPct.toFixed(1)}%</td>
-      <td>${r.nhejPct.toFixed(1)}%${deltaStr}</td>
-      ${anyHDR ? `<td>${r.hasHDR ? r.hdrPct.toFixed(1) + '%' : '—'}</td>` : ''}
+      <td style="color:${r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)'}">${r.nhejPct.toFixed(1)}%</td>
+      ${anyHDR ? `<td style="color:var(--accent2)">${r.hasHDR ? r.hdrPct.toFixed(1) + '%' : '—'}</td>` : ''}
       ${koVis ? koCell : ''}
       <td>${miniBar(r)}</td>
     </tr>`;
