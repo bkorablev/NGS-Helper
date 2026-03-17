@@ -28,6 +28,7 @@
    * 15.  Stats bar
    * 16.  Tooltips
    * 17.  Misc
+   * 18.  Comparison panel
    * ─────────────────────────────────────────────────────────────────────────────
    */
 
@@ -430,6 +431,57 @@
     border-width: 2px;
     flex-shrink: 0;
   }
+
+  /* ─── 18. Comparison panel ─── */
+  .check-col { width: 32px; text-align: center; padding: 4px 6px !important; }
+  .row-check  { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; display: block; margin: 0 auto; }
+
+  tr.results-row-selectable { cursor: pointer; }
+  tr.results-row-selectable.selected td { background: rgba(88,166,255,0.06); }
+  tr.results-row-selectable.selected td:first-child { border-left: 3px solid var(--accent); }
+
+  #comparison-panel {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 2px solid var(--accent);
+    z-index: 200;
+    box-shadow: 0 -6px 32px rgba(0,0,0,0.5);
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+  #comparison-panel.visible { display: block; }
+
+  .cmp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .cmp-title { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); }
+  .cmp-actions { display: flex; gap: 8px; align-items: center; }
+
+  .cmp-body { padding: 12px 24px 20px; overflow-x: auto; }
+
+  .cmp-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .cmp-table th {
+    padding: 6px 10px; text-align: left; color: var(--muted);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  .cmp-table td { padding: 5px 10px; border-bottom: 1px solid rgba(48,54,61,0.5); vertical-align: middle; white-space: nowrap; }
+  .cmp-table tr:last-child td { border-bottom: none; }
+
+  .nhej-delta { font-size: 10px; margin-left: 4px; }
+
+  /* push page content up so sticky panel doesn't obscure it */
+  body.cmp-open main { padding-bottom: 280px; }
 </style>
 </head>
 <body>
@@ -701,6 +753,9 @@
  *  Section 10: Excel export        — exportResults
  *  Section 11: Utilities           — readFileText, readAllelesText, parseTSV,
  *                                   showSpinner, hideSpinner, setLoadingMsg
+ *  Section 12: Comparison          — toggleSelection, clearSelection,
+ *                                   renderComparisonPanel, miniBar,
+ *                                   exportComparison
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -708,6 +763,7 @@
 let samples = [];
 let currentStep = 1;
 let validationPassed = false;
+let selectedIndices = new Set();
 
 // ─── Section 2: Step navigation ───────────────────────────────────────────────
 function goStep(n) {
@@ -1136,6 +1192,8 @@ const parseErrors      = [];
 function loadResults(files) {
   const fileArr = Array.from(files);
   parseErrors.length = 0;
+  selectedIndices.clear();
+  renderComparisonPanel();
 
   if (fileArr.length) {
     const topFolder = fileArr[0].webkitRelativePath.split('/')[0];
@@ -1349,6 +1407,7 @@ function renderResultsTable() {
   const koHiddenClass = koVisible ? '' : ' ko-hidden';
 
   let html = `<table><thead><tr>
+    <th class="check-col"></th>
     <th>Sample</th>
     <th>Reads in Input</th>
     <th>Reads Aligned</th>
@@ -1361,8 +1420,13 @@ function renderResultsTable() {
   </tr></thead><tbody>`;
 
   resultsData.forEach((r, idx) => {
+    const isSel     = selectedIndices.has(idx);
+    const selClass  = isSel ? ' selected' : '';
+    const checkHtml = `<td class="check-col"><input type="checkbox" class="row-check"${isSel ? ' checked' : ''} onclick="event.stopPropagation();toggleSelection(${idx})"></td>`;
+
     if (r.failed) {
-      html += `<tr>
+      html += `<tr id="result-row-${idx}" class="results-row-selectable${selClass}" onclick="toggleSelection(${idx})">
+        ${checkHtml}
         <td style="font-family:var(--mono);color:var(--error)">${r.name}</td>
         <td colspan="6" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
         <td class="ko-col${koHiddenClass}" data-sample-index="${idx}" data-ko-cell></td>
@@ -1373,7 +1437,8 @@ function renderResultsTable() {
     const koTD = koVisible
       ? buildKOCellHTML(r, idx)
       : `<td class="ko-col ko-hidden" data-sample-index="${idx}" data-ko-cell></td>`;
-    html += `<tr>
+    html += `<tr id="result-row-${idx}" class="results-row-selectable${selClass}" onclick="toggleSelection(${idx})">
+      ${checkHtml}
       <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
       <td style="font-family:var(--mono)">${r.readsInInputs.toLocaleString()}</td>
       <td style="font-family:var(--mono)">${r.alignedAllAmplicons.toLocaleString()}</td>
@@ -1683,6 +1748,170 @@ function hideSpinner() {
 }
 
 function setLoadingMsg(msg) { document.getElementById('results-loading-msg').textContent = msg; }
+
+// ─── Section 12: Comparison ───────────────────────────────────────────────────
+function toggleSelection(idx) {
+  if (selectedIndices.has(idx)) {
+    selectedIndices.delete(idx);
+  } else {
+    selectedIndices.add(idx);
+  }
+  const row = document.getElementById(`result-row-${idx}`);
+  if (row) {
+    row.classList.toggle('selected', selectedIndices.has(idx));
+    const cb = row.querySelector('.row-check');
+    if (cb) cb.checked = selectedIndices.has(idx);
+  }
+  renderComparisonPanel();
+}
+
+function clearSelection() {
+  selectedIndices.clear();
+  document.querySelectorAll('.results-row-selectable.selected').forEach(tr => {
+    tr.classList.remove('selected');
+    const cb = tr.querySelector('.row-check');
+    if (cb) cb.checked = false;
+  });
+  renderComparisonPanel();
+}
+
+function miniBar(r, barW = 200) {
+  const BAR_H = 14;
+  let svg = `<svg width="${barW}" height="${BAR_H}" style="display:block;border-radius:2px;overflow:hidden;flex-shrink:0">`;
+  let x = 0;
+  const seg = (pct, fill) => {
+    const w = (pct / 100) * barW;
+    if (w < 0.5) return;
+    svg += `<rect x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${BAR_H}" fill="${fill}"/>`;
+    x += w;
+  };
+  seg(r.refUnmodifiedPct, '#7d8590');
+  seg(r.nhejPct,          '#f85149');
+  if (r.hasHDR)        seg(r.hdrPct,       '#3fb950');
+  if (r.ambiguous > 0) seg(r.ambiguousPct, '#d29922');
+  svg += '</svg>';
+  return svg;
+}
+
+function renderComparisonPanel() {
+  const panel = document.getElementById('comparison-panel');
+  if (selectedIndices.size === 0) {
+    panel.classList.remove('visible');
+    document.body.classList.remove('cmp-open');
+    return;
+  }
+
+  panel.classList.add('visible');
+  document.body.classList.add('cmp-open');
+
+  const selected = [...selectedIndices]
+    .sort((a, b) => a - b)
+    .map(i => resultsData[i])
+    .filter(Boolean);
+
+  const n = selected.length;
+  document.getElementById('cmp-title').textContent =
+    `Comparing ${n} sample${n !== 1 ? 's' : ''}`;
+
+  const anyHDR = selected.some(r => r.hasHDR);
+  const koVis  = koEnabled() && resultsLoadedWithKO;
+
+  // Compute group mean NHEJ % for delta labels (exclude failed samples)
+  const nhejValues = selected.filter(r => !r.failed).map(r => r.nhejPct);
+  const nhejMean   = nhejValues.length
+    ? nhejValues.reduce((a, b) => a + b, 0) / nhejValues.length
+    : 0;
+
+  // Header
+  let thead = `<tr>
+    <th>Sample</th>
+    <th>Aligned %</th>
+    <th>Unmodified %</th>
+    <th>NHEJ %</th>
+    ${anyHDR ? '<th>HDR %</th>' : ''}
+    ${koVis  ? '<th>KO Status</th>' : ''}
+    <th>Breakdown</th>
+  </tr>`;
+
+  // Rows
+  let tbody = '';
+  selected.forEach(r => {
+    if (r.failed) {
+      tbody += `<tr>
+        <td style="color:var(--error)">${r.name}</td>
+        <td colspan="5" style="color:var(--muted)">Failed</td>
+      </tr>`;
+      return;
+    }
+
+    const delta    = r.nhejPct - nhejMean;
+    const deltaStr = nhejValues.length < 2 ? '' :
+      `<span class="nhej-delta" style="color:${delta >= 0 ? 'var(--accent2)' : 'var(--error)'}">(${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%)</span>`;
+
+    let koCell = '';
+    if (koVis) {
+      const { status } = classifyKO(r);
+      koCell = `<td>${status ? koStatusBadge(status) : '—'}</td>`;
+    }
+
+    tbody += `<tr>
+      <td style="color:var(--accent)">${r.name}</td>
+      <td>${r.alignedPct}%</td>
+      <td>${r.refUnmodifiedPct.toFixed(1)}%</td>
+      <td>${r.nhejPct.toFixed(1)}%${deltaStr}</td>
+      ${anyHDR ? `<td>${r.hasHDR ? r.hdrPct.toFixed(1) + '%' : '—'}</td>` : ''}
+      ${koVis ? koCell : ''}
+      <td>${miniBar(r)}</td>
+    </tr>`;
+  });
+
+  document.getElementById('cmp-thead').innerHTML = thead;
+  document.getElementById('cmp-tbody').innerHTML = tbody;
+}
+
+function exportComparison() {
+  if (!selectedIndices.size) return;
+  const selected = [...selectedIndices]
+    .sort((a, b) => a - b)
+    .map(i => resultsData[i])
+    .filter(Boolean);
+
+  const anyHDR = selected.some(r => r.hasHDR);
+  const koVis  = koEnabled() && resultsLoadedWithKO;
+
+  const headers = ['Sample', 'Aligned %', 'Unmodified %', 'NHEJ %'];
+  if (anyHDR) headers.push('HDR %');
+  if (koVis)  headers.push('KO Status', 'KO Warnings');
+
+  const rows = [headers, ...selected.map(r => {
+    const row = [r.name, r.alignedPct, r.refUnmodifiedPct, r.nhejPct];
+    if (anyHDR) row.push(r.hasHDR ? r.hdrPct : '');
+    if (koVis) {
+      const { status, warnings } = classifyKO(r);
+      row.push(status || '—', warnings.join('; '));
+    }
+    return row;
+  })];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Comparison');
+  XLSX.writeFile(wb, 'crispresso_comparison.xlsx');
+}
 </script>
+
+<!-- ════ COMPARISON PANEL ════ -->
+<div id="comparison-panel">
+  <div class="cmp-header">
+    <span class="cmp-title" id="cmp-title">Comparing 0 samples</span>
+    <div class="cmp-actions">
+      <button class="btn btn-secondary" onclick="exportComparison()" style="padding:6px 14px;font-size:12px">⬇ Export comparison</button>
+      <button class="btn btn-secondary" onclick="clearSelection()" style="padding:6px 14px;font-size:12px">Clear selection</button>
+    </div>
+  </div>
+  <div class="cmp-body">
+    <table class="cmp-table"><thead id="cmp-thead"></thead><tbody id="cmp-tbody"></tbody></table>
+  </div>
+</div>
+
 </body>
 </html>
