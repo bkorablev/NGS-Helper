@@ -9,6 +9,29 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
+  /*
+   * ─── CSS Table of Contents ───────────────────────────────────────────────────
+   *  1.  Design tokens
+   *  2.  Reset
+   *  3.  Header
+   *  4.  Nav tabs
+   *  5.  Layout
+   *  6.  Dropzone
+   *  7.  File list
+   *  8.  Form elements
+   *  9.  Sample table
+   * 10.  Buttons & controls
+   * 11.  Spinner / loading
+   * 12.  Validation
+   * 13.  Buttons
+   * 14.  Output boxes
+   * 15.  Stats bar
+   * 16.  Tooltips
+   * 17.  Misc
+   * ─────────────────────────────────────────────────────────────────────────────
+   */
+
+  /* ─── 1. Design tokens ─── */
   :root {
     --bg: #0d1117;
     --surface: #161b22;
@@ -24,6 +47,7 @@
     --sans: 'IBM Plex Sans', sans-serif;
   }
 
+  /* ─── 2. Reset ─── */
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -34,6 +58,7 @@
     min-height: 100vh;
   }
 
+  /* ─── 3. Header ─── */
   header {
     border-bottom: 1px solid var(--border);
     padding: 16px 32px;
@@ -61,6 +86,7 @@
     margin-left: 4px;
   }
 
+  /* ─── 4. Nav tabs ─── */
   .steps-nav {
     display: flex;
     border-bottom: 1px solid var(--border);
@@ -103,6 +129,7 @@
   .step-tab.active .step-num { background: var(--accent); color: #000; border-color: var(--accent); }
   .step-tab.done .step-num { background: var(--accent2); color: #000; border-color: var(--accent2); }
 
+  /* ─── 5. Layout ─── */
   main {
     max-width: 1100px;
     margin: 0 auto;
@@ -139,6 +166,7 @@
     margin-bottom: 14px;
   }
 
+  /* ─── 6. Dropzone ─── */
   .dropzone {
     border: 2px dashed var(--border);
     border-radius: 8px;
@@ -162,6 +190,7 @@
   .dropzone p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   .dropzone p strong { color: var(--text); }
 
+  /* ─── 7. File list ─── */
   .file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
 
   .file-item {
@@ -180,6 +209,7 @@
   .badge-r2 { background: rgba(63,185,80,0.2); color: var(--accent2); }
   .badge-unpaired { background: rgba(248,81,73,0.2); color: var(--error); }
 
+  /* ─── 8. Form elements ─── */
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 
   input[type=text], input[type=number], textarea, select {
@@ -206,6 +236,7 @@
 
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
 
+  /* ─── 9. Sample table ─── */
   table { width: 100%; border-collapse: collapse; }
   thead { background: var(--surface2); position: sticky; top: 0; }
 
@@ -234,6 +265,7 @@
   .label-cell input { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 180px; }
   .seq-cell input { min-width: 200px; font-size: 11px; }
 
+  /* ─── 10. Buttons & controls ─── */
   .fill-wrap { position: relative; display: flex; align-items: center; }
 
   .fill-btn {
@@ -277,6 +309,7 @@
 
   .ko-col.ko-hidden { display: none; }
 
+  /* ─── 11. Spinner / loading ─── */
   #results-loading {
     display: none; flex-direction: column; align-items: center;
     justify-content: center; padding: 48px 0; gap: 16px;
@@ -293,6 +326,7 @@
 
   #results-loading-msg { font-family: var(--mono); font-size: 13px; color: var(--muted); }
 
+  /* ─── 12. Validation ─── */
   .validation-list { display: flex; flex-direction: column; gap: 8px; }
 
   .val-item {
@@ -306,6 +340,7 @@
 
   .val-icon { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
 
+  /* ─── 13. Buttons ─── */
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 9px 18px; border-radius: 6px; font-family: var(--sans);
@@ -323,6 +358,7 @@
 
   .btn-row { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
 
+  /* ─── 14. Output boxes ─── */
   .output-box {
     background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
     padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6;
@@ -338,6 +374,7 @@
 
   .cmd-box span { color: var(--accent2); flex-shrink: 0; }
 
+  /* ─── 15. Stats bar ─── */
   .stats-bar {
     display: flex; gap: 20px; padding: 12px 16px;
     background: var(--surface2); border-radius: 8px; margin-bottom: 16px;
@@ -350,6 +387,7 @@
   .inline-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .inline-row input[type=text] { width: auto; }
 
+  /* ─── 16. Tooltips ─── */
   [data-tip] { position: relative; cursor: help; }
   [data-tip]:hover::after {
     content: attr(data-tip);
@@ -359,6 +397,7 @@
     z-index: 100; font-family: var(--sans); pointer-events: none;
   }
 
+  /* ─── 17. Misc ─── */
   .section-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .helper-text { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
 
@@ -423,7 +462,7 @@
 
 <main>
 
-<!-- STEP 1 -->
+<!-- ════ STEP 1 — Load FASTQs ════ -->
 <div class="panel active" id="panel-1">
   <h2>Load FASTQ Files</h2>
   <p class="subtitle">Select your paired-end FASTQ files. R1/R2 pairs are auto-detected from Illumina naming (<code style="color:var(--accent)">_R1_001</code> / <code style="color:var(--accent)">_R2_001</code>).</p>
@@ -446,7 +485,7 @@
   </div>
 </div>
 
-<!-- STEP 2 -->
+<!-- ════ STEP 2 — Edit Samples ════ -->
 <div class="panel" id="panel-2">
   <h2>Sample Sequences</h2>
   <p class="subtitle">Fill in amplicon and guide sequences for each detected sample. You can paste a column from Excel into any field.</p>
@@ -463,7 +502,7 @@
   </div>
 </div>
 
-<!-- STEP 3 -->
+<!-- ════ STEP 3 — Global Parameters ════ -->
 <div class="panel" id="panel-3">
   <h2>Global Parameters</h2>
   <p class="subtitle">These settings apply to all samples. They map directly to CRISPRessoBatch flags.</p>
@@ -507,7 +546,7 @@
   </div>
 </div>
 
-<!-- STEP 4 -->
+<!-- ════ STEP 4 — Validate ════ -->
 <div class="panel" id="panel-4">
   <h2>Validation Report</h2>
   <p class="subtitle">Check all issues before generating your .batch file.</p>
@@ -522,7 +561,7 @@
   </div>
 </div>
 
-<!-- STEP 5 -->
+<!-- ════ STEP 5 — Export ════ -->
 <div class="panel" id="panel-5">
   <h2>Export</h2>
   <p class="subtitle">Your .batch file is ready. Download it and run CRISPRessoBatch from the same directory as your FASTQs.</p>
@@ -550,7 +589,7 @@
   <div id="copy-confirm" style="display:none;color:var(--accent2);font-size:13px;margin-top:8px">✓ Copied to clipboard!</div>
 </div>
 
-<!-- STEP 6: Results Aggregator -->
+<!-- ════ STEP 6 — Results Aggregator ════ -->
 <div class="panel" id="panel-6">
   <h2>Results Aggregator</h2>
   <p class="subtitle">Select your CRISPRessoBatch output folder to summarise editing efficiency across all samples. In Chrome, selecting the folder will include all subfolders automatically.</p>
@@ -638,12 +677,39 @@
 </main>
 
 <script>
-// ─── State ────────────────────────────────────────────────────────────────────
+/*
+ * ─── JS Table of Contents ─────────────────────────────────────────────────────
+ *  Section 1:  State
+ *  Section 2:  Step navigation    — goStep
+ *  Section 3:  URL auto-load      — handleURLParams
+ *  Section 4:  File handling      — handleFiles, renderFileList, clearFiles,
+ *                                   drag/drop listeners
+ *  Section 5:  Sample table       — updateSample, handleEnterKey, deleteSample,
+ *                                   fillDown, renderSampleTable
+ *  Section 6:  Validation         — runValidation, revComp
+ *  Section 7:  Export             — buildExport, downloadBatch, downloadBatchXlsx,
+ *                                   copyCmd
+ *  Section 8:  Results aggregator — loadResults, parseSample,
+ *                                   parseAllelesIntoResult, buildKOCellHTML,
+ *                                   renderResultsTable, updateKOCells,
+ *                                   showKOColumn, hideKOColumn,
+ *                                   renderResultsCharts, renderParseErrors
+ *  Section 9:  KO classification  — classifyAllele, alleleLabel, classifyKO,
+ *                                   koStatusBadge, renderKOSummaryBar,
+ *                                   koEnabled, onKOToggle, runKOOnDemand,
+ *                                   reEvalKO
+ *  Section 10: Excel export        — exportResults
+ *  Section 11: Utilities           — readFileText, readAllelesText, parseTSV,
+ *                                   showSpinner, hideSpinner, setLoadingMsg
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+// ─── Section 1: State ─────────────────────────────────────────────────────────
 let samples = [];
 let currentStep = 1;
 let validationPassed = false;
 
-// ─── Step navigation ──────────────────────────────────────────────────────────
+// ─── Section 2: Step navigation ───────────────────────────────────────────────
 function goStep(n) {
   if (n === 5) buildExport();
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -653,7 +719,7 @@ function goStep(n) {
   currentStep = n;
 }
 
-// ─── URL param auto-load ──────────────────────────────────────────────────────
+// ─── Section 3: URL auto-load ─────────────────────────────────────────────────
 // Reads ?results=/path/to/folder and auto-navigates to Step 6 with a banner.
 // Because browsers cannot read arbitrary local paths via JS, we can't auto-load
 // the folder silently — the File System Access API or webkitdirectory both require
@@ -704,7 +770,7 @@ function handleURLParams() {
 // Run on load
 window.addEventListener('DOMContentLoaded', handleURLParams);
 
-// ─── File handling ────────────────────────────────────────────────────────────
+// ─── Section 4: File handling ─────────────────────────────────────────────────
 function handleFiles(files) {
   const fileArr = Array.from(files);
   const r1Pattern = /_R1_\d+\.(fastq|fq)(\.gz)?$/i;
@@ -801,7 +867,7 @@ dz.addEventListener('drop', e => {
   handleFiles(e.dataTransfer.files);
 });
 
-// ─── Sample table ─────────────────────────────────────────────────────────────
+// ─── Section 5: Sample table ──────────────────────────────────────────────────
 function updateSample(el, field) {
   const i   = parseInt(el.dataset.row);
   let   val = el.value;
@@ -914,7 +980,7 @@ function renderSampleTable() {
   wrap.innerHTML = html;
 }
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+// ─── Section 6: Validation ────────────────────────────────────────────────────
 function runValidation() {
   const list   = document.getElementById('validation-list');
   const checks = [];
@@ -999,7 +1065,7 @@ function revComp(seq) {
   return seq.split('').reverse().map(b => ({A:'T',T:'A',C:'G',G:'C',N:'N'}[b]||b)).join('');
 }
 
-// ─── Build export ─────────────────────────────────────────────────────────────
+// ─── Section 7: Export ────────────────────────────────────────────────────────
 function buildExport() {
   const cols = ['name', 'fastq_r1', 'fastq_r2', 'amplicon_seq', 'guide_seq'];
   const hasHDR = samples.some(s => s.hdr_seq);
@@ -1062,27 +1128,10 @@ function copyCmd() {
   setTimeout(() => c.style.display = 'none', 2000);
 }
 
-// ─── Results aggregator ───────────────────────────────────────────────────────
+// ─── Section 8: Results aggregator ───────────────────────────────────────────
 let resultsData        = [];
 let resultsLoadedWithKO = false;
 const parseErrors      = [];
-
-function setLoadingMsg(msg) { document.getElementById('results-loading-msg').textContent = msg; }
-
-function showSpinner() {
-  const el = document.getElementById('results-loading');
-  el.classList.remove('fade-out');
-  el.style.display = 'flex';
-  document.getElementById('results-content').style.display = 'none';
-  document.getElementById('results-empty').style.display   = 'none';
-  document.getElementById('results-errors').style.display  = 'none';
-}
-
-function hideSpinner() {
-  const el = document.getElementById('results-loading');
-  el.classList.add('fade-out');
-  setTimeout(() => { el.style.display = 'none'; el.classList.remove('fade-out'); }, 320);
-}
 
 function loadResults(files) {
   const fileArr = Array.from(files);
@@ -1154,41 +1203,6 @@ function loadResults(files) {
     document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
     if (koEnabled() && resultsData.length) runKOOnDemand(false);
   }).catch(() => hideSpinner());
-}
-
-function readFileText(file) {
-  return new Promise((resolve, reject) => {
-    const r    = new FileReader();
-    r.onload   = e => resolve(e.target.result);
-    r.onerror  = () => reject(new Error('FileReader error'));
-    r.readAsText(file);
-  });
-}
-
-async function readAllelesText(file) {
-  if (!file.name.endsWith('.zip')) return readFileText(file);
-  const buf = await new Promise((resolve, reject) => {
-    const r   = new FileReader();
-    r.onload  = e => resolve(e.target.result);
-    r.onerror = () => reject(new Error('FileReader error'));
-    r.readAsArrayBuffer(file);
-  });
-  const zip     = await JSZip.loadAsync(buf);
-  const txtName = Object.keys(zip.files).find(n => n.endsWith('.txt') && !zip.files[n].dir);
-  if (!txtName) throw new Error('no .txt file found inside zip');
-  return zip.files[txtName].async('string');
-}
-
-function parseTSV(text) {
-  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split('\t');
-  return lines.slice(1).map(line => {
-    const vals = line.split('\t');
-    const obj  = {};
-    headers.forEach((h, i) => { obj[h.trim()] = (vals[i] || '').trim(); });
-    return obj;
-  });
 }
 
 async function parseSample(subfolder, files) {
@@ -1426,6 +1440,7 @@ function renderParseErrors() {
   el.style.display = 'block';
 }
 
+// ─── Section 9: KO classification ────────────────────────────────────────────
 function classifyAllele(a, largeDel) {
   const { nDel, nIns, readStatus } = a;
   if (readStatus === 'UNMODIFIED' && nDel === 0 && nIns === 0) return 'Wildtype';
@@ -1570,6 +1585,7 @@ function reEvalKO() {
   renderKOSummaryBar();
 }
 
+// ─── Section 10: Excel export ─────────────────────────────────────────────────
 function exportResults() {
   const wb          = XLSX.utils.book_new();
   const anyHDR      = resultsData.some(r => r.hasHDR);
@@ -1614,6 +1630,59 @@ function exportResults() {
 
   XLSX.writeFile(wb, 'crispresso_results.xlsx');
 }
+
+// ─── Section 11: Utilities ────────────────────────────────────────────────────
+function readFileText(file) {
+  return new Promise((resolve, reject) => {
+    const r    = new FileReader();
+    r.onload   = e => resolve(e.target.result);
+    r.onerror  = () => reject(new Error('FileReader error'));
+    r.readAsText(file);
+  });
+}
+
+async function readAllelesText(file) {
+  if (!file.name.endsWith('.zip')) return readFileText(file);
+  const buf = await new Promise((resolve, reject) => {
+    const r   = new FileReader();
+    r.onload  = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error('FileReader error'));
+    r.readAsArrayBuffer(file);
+  });
+  const zip     = await JSZip.loadAsync(buf);
+  const txtName = Object.keys(zip.files).find(n => n.endsWith('.txt') && !zip.files[n].dir);
+  if (!txtName) throw new Error('no .txt file found inside zip');
+  return zip.files[txtName].async('string');
+}
+
+function parseTSV(text) {
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split('\t');
+  return lines.slice(1).map(line => {
+    const vals = line.split('\t');
+    const obj  = {};
+    headers.forEach((h, i) => { obj[h.trim()] = (vals[i] || '').trim(); });
+    return obj;
+  });
+}
+
+function showSpinner() {
+  const el = document.getElementById('results-loading');
+  el.classList.remove('fade-out');
+  el.style.display = 'flex';
+  document.getElementById('results-content').style.display = 'none';
+  document.getElementById('results-empty').style.display   = 'none';
+  document.getElementById('results-errors').style.display  = 'none';
+}
+
+function hideSpinner() {
+  const el = document.getElementById('results-loading');
+  el.classList.add('fade-out');
+  setTimeout(() => { el.style.display = 'none'; el.classList.remove('fade-out'); }, 320);
+}
+
+function setLoadingMsg(msg) { document.getElementById('results-loading-msg').textContent = msg; }
 </script>
 </body>
 </html>
