@@ -480,6 +480,35 @@
 
   /* push page content up so sticky panel doesn't obscure it */
   body.cmp-open main { padding-bottom: 280px; }
+
+  /* ─── 19. Indel size distribution ─── */
+  .indel-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 800px) { .indel-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px)  { .indel-grid { grid-template-columns: 1fr; } }
+
+  .indel-mini {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .indel-mini:hover { border-color: var(--accent); }
+
+  .indel-mini-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 </style>
 </head>
 <body>
@@ -707,6 +736,20 @@
         <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#3fb950" rx="2"/></svg>HDR</span>
         <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#d29922" rx="2"/></svg>Ambiguous</span>
       </div>
+    </div>
+
+    <div class="card" id="indel-dist-card" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin-bottom:0">Indel size distribution</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <button class="btn btn-secondary" id="indel-yaxis-btn" onclick="toggleIndelYAxis()" style="padding:5px 12px;font-size:12px;font-family:var(--mono)">Read count</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="indel-fs-toggle" checked onchange="renderIndelCharts()">
+            Frameshift highlight
+          </label>
+        </div>
+      </div>
+      <div id="indel-chart-area"></div>
     </div>
 
     <div class="btn-row">
@@ -1186,10 +1229,14 @@ function copyCmd() {
 let resultsData        = [];
 let resultsLoadedWithKO = false;
 const parseErrors      = [];
+let indelYAxisMode     = 'count'; // 'count' | 'pct'
+let indelExpandedIdx   = null;
 
 function loadResults(files) {
   const fileArr = Array.from(files);
   parseErrors.length = 0;
+  indelYAxisMode   = 'count';
+  indelExpandedIdx = null;
   selectedIndices.clear();
   renderComparisonPanel();
 
@@ -1213,18 +1260,22 @@ function loadResults(files) {
     const fname   = parts[parts.length - 1];
     const isQuant      = fname === 'CRISPResso_quantification_of_editing_frequency.txt';
     const isMap        = fname === 'CRISPResso_mapping_statistics.txt';
-    const isRefHist    = fname === 'Reference.Deletion_histogram.txt';
-    const isDelHist    = fname === 'Deletion_histogram.txt';
-    const isRefAlleles = fname.startsWith('Reference.Alleles_frequency_table');
-    const isAlleles    = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
-    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefAlleles && !isAlleles) return;
-    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null };
-    if (isQuant)                                    groups[subKey].quantFile   = f;
-    else if (isMap)                                 groups[subKey].mapFile     = f;
-    else if (isRefHist)                             groups[subKey].delHistFile = f;
-    else if (isDelHist && !groups[subKey].delHistFile) groups[subKey].delHistFile = f;
-    else if (isRefAlleles)                          groups[subKey].allelesFile = f;
-    else if (isAlleles && !groups[subKey].allelesFile) groups[subKey].allelesFile = f;
+    const isRefHist      = fname === 'Reference.Deletion_histogram.txt';
+    const isDelHist      = fname === 'Deletion_histogram.txt';
+    const isRefIndelHist = fname === 'Reference.Indel_histogram.txt';
+    const isIndelHist    = fname === 'Indel_histogram.txt';
+    const isRefAlleles   = fname.startsWith('Reference.Alleles_frequency_table');
+    const isAlleles      = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
+    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefAlleles && !isAlleles) return;
+    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, indelHistFile: null };
+    if (isQuant)                                         groups[subKey].quantFile    = f;
+    else if (isMap)                                      groups[subKey].mapFile      = f;
+    else if (isRefHist)                                  groups[subKey].delHistFile  = f;
+    else if (isDelHist && !groups[subKey].delHistFile)   groups[subKey].delHistFile  = f;
+    else if (isRefIndelHist)                             groups[subKey].indelHistFile = f;
+    else if (isIndelHist && !groups[subKey].indelHistFile) groups[subKey].indelHistFile = f;
+    else if (isRefAlleles)                               groups[subKey].allelesFile  = f;
+    else if (isAlleles && !groups[subKey].allelesFile)   groups[subKey].allelesFile  = f;
   });
 
   const subfolders = Object.keys(groups).sort();
@@ -1253,6 +1304,7 @@ function loadResults(files) {
     );
     renderResultsTable();
     renderResultsCharts();
+    renderIndelCharts();
     renderParseErrors();
     renderKOSummaryBar();
     hideSpinner();
@@ -1272,6 +1324,7 @@ async function parseSample(subfolder, files) {
     refUnmodifiedPct: 0, nhejPct: 0, hdrPct: 0, ambiguousPct: 0, alignedPct: 0,
     hasDelHist: false, delFsReads: 0, delInFrameReads: 0,
     delTotalReads: 0, delFsPct: 0, largeDels: [],
+    hasIndelData: false, indelData: [],
     hasAllelesData: false, topAlleles: []
   };
 
@@ -1280,10 +1333,11 @@ async function parseSample(subfolder, files) {
       parseErrors.push(`${name}: failed to read ${label} — ${e.message}`); return null;
     }) : Promise.resolve(null);
 
-  const [mapText, quantText, delHistText] = await Promise.all([
-    safeRead(files.mapFile,     'CRISPResso_mapping_statistics.txt'),
-    safeRead(files.quantFile,   'CRISPResso_quantification_of_editing_frequency.txt'),
-    safeRead(files.delHistFile, 'deletion histogram'),
+  const [mapText, quantText, delHistText, indelHistText] = await Promise.all([
+    safeRead(files.mapFile,       'CRISPResso_mapping_statistics.txt'),
+    safeRead(files.quantFile,     'CRISPResso_quantification_of_editing_frequency.txt'),
+    safeRead(files.delHistFile,   'deletion histogram'),
+    safeRead(files.indelHistFile, 'indel histogram'),
   ]);
 
   if (mapText) {
@@ -1345,6 +1399,18 @@ async function parseSample(subfolder, files) {
     result.delTotalReads   = totalDelReads;
     result.delFsPct        = totalDelReads > 0 ? (fsReads / totalDelReads) * 100 : 0;
     result.largeDels       = largeDels;
+  }
+
+  if (indelHistText) {
+    const rows = parseTSV(indelHistText);
+    const data = [];
+    rows.forEach(row => {
+      const size = parseInt(row['indel_size'] || row['Indel_size'] || row['Size'] || row['size'] || '0') || 0;
+      const fq   = parseInt(row['fq']) || 0;
+      if (size !== 0) data.push({ size, fq });
+    });
+    result.indelData    = data;
+    result.hasIndelData = data.length > 0;
   }
 
   result.allelesFileRef = files.allelesFile || null;
@@ -1493,6 +1559,151 @@ function renderResultsCharts() {
   });
   svg += '</svg>';
   document.getElementById('results-chart-wrap').innerHTML = svg;
+}
+
+// ─── Section 13: Indel size distribution ─────────────────────────────────────
+function toggleIndelYAxis() {
+  indelYAxisMode = indelYAxisMode === 'count' ? 'pct' : 'count';
+  document.getElementById('indel-yaxis-btn').textContent =
+    indelYAxisMode === 'count' ? 'Read count' : '% of aligned reads';
+  renderIndelCharts();
+}
+
+function renderIndelCharts() {
+  const card = document.getElementById('indel-dist-card');
+  if (!card) return;
+  const withData = resultsData.filter(r => !r.failed && r.hasIndelData);
+  if (!withData.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  // Shared x range across all samples
+  const allSizes = withData.flatMap(r => r.indelData.map(d => d.size));
+  const xMin = Math.min(...allSizes);
+  const xMax = Math.max(...allSizes);
+
+  const area = document.getElementById('indel-chart-area');
+
+  if (indelExpandedIdx !== null) {
+    const r = resultsData[indelExpandedIdx];
+    if (!r || !r.hasIndelData) { indelExpandedIdx = null; renderIndelCharts(); return; }
+    area.innerHTML =
+      `<div style="margin-bottom:10px;display:flex;align-items:center;gap:14px">
+        <button class="btn btn-secondary" onclick="indelExpandedIdx=null;renderIndelCharts()" style="padding:5px 12px;font-size:12px;font-family:var(--mono)">← Back to all samples</button>
+        <span style="font-family:var(--mono);font-size:13px;color:var(--accent)">${r.name}</span>
+      </div>` +
+      drawIndelSvg(r, xMin, xMax, 760, 260, 48, 12, 18, 28, true);
+    return;
+  }
+
+  let html = '<div class="indel-grid">';
+  withData.forEach(r => {
+    const idx = resultsData.indexOf(r);
+    html += `<div class="indel-mini" onclick="indelExpandedIdx=${idx};renderIndelCharts()">
+      <div class="indel-mini-title">${r.name}</div>
+      ${drawIndelSvg(r, xMin, xMax, 280, 160, 32, 6, 10, 24, false)}
+    </div>`;
+  });
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function drawIndelSvg(r, xMin, xMax, W, H, ML, MR, MT, MB, expanded) {
+  const fsOn   = document.getElementById('indel-fs-toggle').checked;
+  const usePct = indelYAxisMode === 'pct';
+  const aln    = r.alignedAllAmplicons || 1;
+  const cW     = W - ML - MR;
+  const cH     = H - MT - MB;
+
+  // Full set of integer sizes in range, skipping 0
+  const sizes = [];
+  for (let s = xMin; s <= xMax; s++) { if (s !== 0) sizes.push(s); }
+  const n = sizes.length;
+  if (!n) return '';
+
+  const dataMap = {};
+  r.indelData.forEach(d => { dataMap[d.size] = d.fq; });
+
+  const yVals = sizes.map(s => {
+    const fq = dataMap[s] || 0;
+    return usePct ? (fq / aln * 100) : fq;
+  });
+  const yMax = Math.max(...yVals, 1e-9);
+
+  const slotW = cW / n;
+  const bW    = Math.max(slotW - 0.5, 0.5);
+
+  let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;font-family:'IBM Plex Mono',monospace">`;
+
+  // Bars
+  sizes.forEach((s, i) => {
+    const yVal = yVals[i];
+    if (yVal <= 0) return;
+    const bh   = (yVal / yMax) * cH;
+    const bx   = ML + i * slotW;
+    const by   = MT + cH - bh;
+    const isFS = Math.abs(s) % 3 !== 0;
+    let fill;
+    if (s < 0) fill = fsOn ? (isFS ? '#f85149' : '#d29922') : '#f85149';
+    else       fill = fsOn ? (isFS ? '#58a6ff' : '#a5d6ff') : '#58a6ff';
+    svg += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bW.toFixed(1)}" height="${bh.toFixed(1)}" fill="${fill}"/>`;
+  });
+
+  // Zero separator line (between last negative and first positive)
+  const negCount = sizes.filter(s => s < 0).length;
+  if (negCount > 0 && negCount < n) {
+    const zx = (ML + negCount * slotW).toFixed(1);
+    svg += `<line x1="${zx}" y1="${MT}" x2="${zx}" y2="${MT + cH}" stroke="#7d8590" stroke-width="1" stroke-dasharray="3,2" opacity="0.5"/>`;
+  }
+
+  // X-axis baseline
+  svg += `<line x1="${ML}" y1="${MT + cH}" x2="${ML + cW}" y2="${MT + cH}" stroke="#30363d" stroke-width="1"/>`;
+
+  // X-axis tick labels
+  const tickSizes = expanded
+    ? sizes.filter((_, i) => i % Math.max(1, Math.ceil(n / 18)) === 0).concat(sizes[n - 1])
+    : [sizes[0], ...(negCount > 0 && negCount < n ? ['_zero_'] : []), sizes[n - 1]];
+
+  const seenTicks = new Set();
+  tickSizes.forEach(s => {
+    if (seenTicks.has(s)) return; seenTicks.add(s);
+    let ix, lbl;
+    if (s === '_zero_') {
+      ix  = negCount;
+      lbl = '0';
+    } else {
+      ix  = sizes.indexOf(s);
+      lbl = s > 0 ? `+${s}` : `${s}`;
+    }
+    if (ix < 0) return;
+    const tx = (ML + ix * slotW + (s === '_zero_' ? 0 : slotW / 2)).toFixed(1);
+    svg += `<text x="${tx}" y="${MT + cH + 13}" text-anchor="middle" fill="#7d8590" font-size="9">${lbl}</text>`;
+  });
+
+  // Y-axis labels
+  const fmt = v => usePct
+    ? v.toFixed(1) + '%'
+    : (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v).toString());
+  svg += `<text x="${ML - 2}" y="${MT + cH}" text-anchor="end" fill="#7d8590" font-size="8">0</text>`;
+  svg += `<text x="${ML - 2}" y="${MT + 7}" text-anchor="end" fill="#7d8590" font-size="8">${fmt(yMax)}</text>`;
+
+  // Rotated y-axis label (expanded only)
+  if (expanded) {
+    const ly = MT + cH / 2, lx = 11;
+    svg += `<text x="${lx}" y="${ly}" text-anchor="middle" fill="#7d8590" font-size="9" transform="rotate(-90,${lx},${ly})">${usePct ? '% of aligned reads' : 'read count'}</text>`;
+  }
+
+  // Peak annotation — highest-fq bar
+  const peakI = yVals.indexOf(Math.max(...yVals));
+  if (peakI >= 0 && yVals[peakI] > 0) {
+    const ps  = sizes[peakI];
+    const pbh = (yVals[peakI] / yMax) * cH;
+    const px  = (ML + peakI * slotW + slotW / 2).toFixed(1);
+    const py  = (MT + cH - pbh - 4).toFixed(1);
+    svg += `<text x="${px}" y="${py}" text-anchor="middle" fill="#e6edf3" font-size="8">${(ps > 0 ? '+' : '') + ps}:${fmt(yVals[peakI])}</text>`;
+  }
+
+  svg += '</svg>';
+  return svg;
 }
 
 function renderParseErrors() {
