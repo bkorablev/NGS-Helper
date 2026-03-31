@@ -748,40 +748,10 @@
     </div>
   </div>
 
-  <div class="card" id="ko-settings-card">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div class="card-title" style="margin-bottom:0">KO Classification</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:13px;font-family:var(--mono);color:var(--muted)">Enable KO Classification</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="ko-enabled" onchange="onKOToggle()">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </div>
-    <div id="ko-settings-body" style="display:none;margin-top:12px">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Expected allele copies</label>
-          <input type="number" id="ko-ploidy" value="2" min="1" max="20" style="width:80px" oninput="reEvalKO()">
-          <div class="helper-text">e.g. 2 for diploid (RPE-1), 3 for triploid (K562)</div>
-        </div>
-        <div class="form-group">
-          <label>In-frame deletion override (bp)</label>
-          <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
-          <div class="helper-text">In-frame deletions ≥ this size reclassified as likely disruptive</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div id="results-loading">
     <div class="spinner"></div>
     <div id="results-loading-msg">Reading files…</div>
   </div>
-
-  <!-- KO summary bar — always visible once results are loaded, across all views -->
-  <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
 
   <!-- ════ Dashboard tile grid ════ -->
   <div id="results-dashboard" style="display:none">
@@ -793,6 +763,7 @@
           <div class="dash-tile-icon"></div>
           <div class="dash-tile-title">Summary</div>
           <div class="dash-tile-desc">Editing efficiency across all samples</div>
+          <div id="ko-tile-indicator" style="margin-top:5px;font-size:11px;font-family:var(--mono);color:var(--muted)">KO: off</div>
         </div>
         <div class="dash-tile-preview" id="tile-preview-summary">
           <div class="dash-tile-empty-msg">Load a results folder to preview</div>
@@ -831,6 +802,36 @@
     <div class="btn-row" style="margin-top:0;margin-bottom:16px">
       <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
     </div>
+
+    <div class="card" id="ko-settings-card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title" style="margin-bottom:0">KO Classification</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px;font-family:var(--mono);color:var(--muted)">Enable KO Classification</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ko-enabled" onchange="onKOToggle()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div id="ko-settings-body" style="display:none;margin-top:12px">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expected allele copies</label>
+            <input type="number" id="ko-ploidy" value="2" min="1" max="20" style="width:80px" oninput="reEvalKO()">
+            <div class="helper-text">e.g. 2 for diploid (RPE-1), 3 for triploid (K562)</div>
+          </div>
+          <div class="form-group">
+            <label>In-frame deletion override (bp)</label>
+            <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
+            <div class="helper-text">In-frame deletions ≥ this size reclassified as likely disruptive</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
+
     <div class="card">
       <div class="card-title">Summary</div>
       <div class="table-wrap" id="results-table-wrap"></div>
@@ -1858,6 +1859,7 @@ function showResultsView(view) {
 // Render all tile previews. Called on initial load and on every return to dashboard
 // (so previews stay current if KO settings or other state changed in a drill-down).
 function renderDashboard() {
+  updateKOTileIndicator();
   renderTilePreviewSummary();
   renderTilePreviewBreakdown();
   renderTilePreviewIndel();
@@ -2087,10 +2089,19 @@ function koEnabled() { return document.getElementById('ko-enabled').checked; }
 function onKOToggle() {
   const enabled = koEnabled();
   document.getElementById('ko-settings-body').style.display = enabled ? '' : 'none';
+  updateKOTileIndicator();
   if (!resultsData.length) return;
   if (enabled && !resultsLoadedWithKO) runKOOnDemand();
-  else if (enabled) { showKOColumn(); renderKOSummaryBar(); }
-  else              { hideKOColumn(); renderKOSummaryBar(); }
+  else if (enabled) { showKOColumn(); renderKOSummaryBar(); renderTilePreviewSummary(); }
+  else              { hideKOColumn(); renderKOSummaryBar(); renderTilePreviewSummary(); }
+}
+
+function updateKOTileIndicator() {
+  const el = document.getElementById('ko-tile-indicator');
+  if (!el) return;
+  const on = koEnabled();
+  el.style.color = on ? 'var(--accent2)' : 'var(--muted)';
+  el.textContent = on ? '● KO: enabled' : 'KO: off';
 }
 
 async function runKOOnDemand(showFullSpinner = true) {
@@ -2209,7 +2220,7 @@ function showSpinner() {
   el.classList.remove('fade-out');
   el.style.display = 'flex';
   ['results-dashboard','results-summary-view','results-breakdown-view',
-   'results-indel-view','ko-summary-bar'].forEach(id => {
+   'results-indel-view'].forEach(id => {
     const e = document.getElementById(id); if (e) e.style.display = 'none';
   });
   document.getElementById('results-empty').style.display  = 'none';
