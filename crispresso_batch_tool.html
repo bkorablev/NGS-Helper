@@ -509,6 +509,66 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  /* ─── 20. Dashboard tiles ─── */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 800px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px)  { .dash-grid { grid-template-columns: 1fr; } }
+
+  .dash-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    height: 280px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    overflow: hidden;
+    user-select: none;
+  }
+  .dash-tile:hover { border-color: var(--accent); background: var(--surface2); }
+
+  .dash-tile-header { padding: 16px 18px 14px; flex-shrink: 0; }
+  .dash-tile-icon   { font-size: 22px; margin-bottom: 6px; }
+  .dash-tile-title  { font-family: var(--sans); font-weight: 600; font-size: 15px; color: var(--text); margin-bottom: 4px; }
+  .dash-tile-desc   { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  .dash-tile-preview {
+    border-top: 1px solid var(--border);
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    padding: 10px 12px 8px;
+    display: flex;
+    align-items: flex-start;
+  }
+  .dash-tile-preview svg { pointer-events: none; width: 100%; }
+
+  .dash-tile-empty-msg {
+    width: 100%;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    align-self: center;
+  }
+
+  /* Fade gradient at the bottom of truncated bar previews */
+  .dash-preview-fade {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 44px;
+    background: linear-gradient(transparent, var(--surface));
+    pointer-events: none;
+    transition: background 0.15s ease;
+  }
+  .dash-tile:hover .dash-preview-fade { background: linear-gradient(transparent, var(--surface2)); }
 </style>
 </head>
 <body>
@@ -720,13 +780,71 @@
     <div id="results-loading-msg">Reading files…</div>
   </div>
 
-  <div id="results-content" style="display:none">
-    <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
+  <!-- KO summary bar — always visible once results are loaded, across all views -->
+  <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
+
+  <!-- ════ Dashboard tile grid ════ -->
+  <div id="results-dashboard" style="display:none">
+    <div class="dash-grid">
+
+      <!-- Tile 1: Summary -->
+      <div class="dash-tile" onclick="showResultsView('summary')">
+        <div class="dash-tile-header">
+          <div class="dash-tile-icon"></div>
+          <div class="dash-tile-title">Summary</div>
+          <div class="dash-tile-desc">Editing efficiency across all samples</div>
+        </div>
+        <div class="dash-tile-preview" id="tile-preview-summary">
+          <div class="dash-tile-empty-msg">Load a results folder to preview</div>
+        </div>
+      </div>
+
+      <!-- Tile 2: Editing Breakdown -->
+      <div class="dash-tile" onclick="showResultsView('breakdown')">
+        <div class="dash-tile-header">
+          <div class="dash-tile-icon"></div>
+          <div class="dash-tile-title">Editing Breakdown</div>
+          <div class="dash-tile-desc">Per-sample NHEJ, HDR and unmodified reads</div>
+        </div>
+        <div class="dash-tile-preview" id="tile-preview-breakdown">
+          <div class="dash-tile-empty-msg">Load a results folder to preview</div>
+        </div>
+      </div>
+
+      <!-- Tile 3: Indel Distribution -->
+      <div class="dash-tile" onclick="showResultsView('indel')">
+        <div class="dash-tile-header">
+          <div class="dash-tile-icon"></div>
+          <div class="dash-tile-title">Indel Distribution</div>
+          <div class="dash-tile-desc">Insertion and deletion size profiles</div>
+        </div>
+        <div class="dash-tile-preview" id="tile-preview-indel">
+          <div class="dash-tile-empty-msg">Load a results folder to preview</div>
+        </div>
+      </div>
+
+    </div><!-- /.dash-grid -->
+  </div><!-- /#results-dashboard -->
+
+  <!-- ════ Drill-down: Summary ════ -->
+  <div id="results-summary-view" style="display:none">
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
+    </div>
     <div class="card">
       <div class="card-title">Summary</div>
       <div class="table-wrap" id="results-table-wrap"></div>
     </div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="exportResults()">⬇ Export to Excel</button>
+    </div>
+  </div>
 
+  <!-- ════ Drill-down: Editing Breakdown ════ -->
+  <div id="results-breakdown-view" style="display:none">
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
+    </div>
     <div class="card">
       <div class="card-title">Editing breakdown</div>
       <div id="results-chart-wrap"></div>
@@ -737,8 +855,14 @@
         <span><svg width="12" height="12" style="vertical-align:middle;margin-right:4px"><rect width="12" height="12" fill="#d29922" rx="2"/></svg>Ambiguous</span>
       </div>
     </div>
+  </div>
 
-    <div class="card" id="indel-dist-card" style="display:none">
+  <!-- ════ Drill-down: Indel Distribution ════ -->
+  <div id="results-indel-view" style="display:none">
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
+    </div>
+    <div class="card" id="indel-dist-card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <div class="card-title" style="margin-bottom:0">Indel size distribution</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -750,10 +874,6 @@
         </div>
       </div>
       <div id="indel-chart-area"></div>
-    </div>
-
-    <div class="btn-row">
-      <button class="btn btn-success" onclick="exportResults()">⬇ Export to Excel</button>
     </div>
   </div>
 
@@ -797,6 +917,12 @@
  *  Section 12: Comparison          — toggleSelection, clearSelection,
  *                                   renderComparisonPanel, miniBar,
  *                                   exportComparison
+ *  Section 13: Indel distribution  — toggleIndelYAxis, renderIndelCharts,
+ *                                   drawIndelSvg
+ *  Section 14: Dashboard           — showResultsView, renderDashboard,
+ *                                   renderTilePreviewSummary,
+ *                                   renderTilePreviewBreakdown,
+ *                                   renderTilePreviewIndel, tileBarChartSvg
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1231,12 +1357,14 @@ let resultsLoadedWithKO = false;
 const parseErrors      = [];
 let indelYAxisMode     = 'count'; // 'count' | 'pct'
 let indelExpandedIdx   = null;
+let resultsView        = 'dashboard'; // 'dashboard' | 'summary' | 'breakdown' | 'indel'
 
 function loadResults(files) {
   const fileArr = Array.from(files);
   parseErrors.length = 0;
   indelYAxisMode   = 'count';
   indelExpandedIdx = null;
+  resultsView      = 'dashboard';
   selectedIndices.clear();
   renderComparisonPanel();
 
@@ -1308,7 +1436,7 @@ function loadResults(files) {
     renderParseErrors();
     renderKOSummaryBar();
     hideSpinner();
-    document.getElementById('results-content').style.display = resultsData.length ? 'block' : 'none';
+    if (resultsData.length) showResultsView('dashboard');
     if (koEnabled() && resultsData.length) runKOOnDemand(false);
   }).catch(() => hideSpinner());
 }
@@ -1570,18 +1698,18 @@ function toggleIndelYAxis() {
 }
 
 function renderIndelCharts() {
-  const card = document.getElementById('indel-dist-card');
-  if (!card) return;
+  const area = document.getElementById('indel-chart-area');
+  if (!area) return;
   const withData = resultsData.filter(r => !r.failed && r.hasIndelData);
-  if (!withData.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
+  if (!withData.length) {
+    area.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:24px 0;text-align:center">No indel histogram data found for any sample.</div>';
+    return;
+  }
 
   // Shared x range across all samples
   const allSizes = withData.flatMap(r => r.indelData.map(d => d.size));
   const xMin = Math.min(...allSizes);
   const xMax = Math.max(...allSizes);
-
-  const area = document.getElementById('indel-chart-area');
 
   if (indelExpandedIdx !== null) {
     const r = resultsData[indelExpandedIdx];
@@ -1704,6 +1832,141 @@ function drawIndelSvg(r, xMin, xMax, W, H, ML, MR, MT, MB, expanded) {
 
   svg += '</svg>';
   return svg;
+}
+
+// ─── Section 14: Dashboard ─────────────────────────────────────────────────────
+// DASH_VIEWS maps view keys to their container element IDs.
+// To add a 5th tile: (1) add an entry here, (2) add the HTML tile + drill-down
+// div in panel-6, (3) add a renderTilePreview* function below.
+const DASH_VIEWS = {
+  dashboard: 'results-dashboard',
+  summary:   'results-summary-view',
+  breakdown: 'results-breakdown-view',
+  indel:     'results-indel-view',
+};
+
+// Show one view and hide all others. Refreshes tile previews when returning to dashboard.
+function showResultsView(view) {
+  resultsView = view;
+  Object.entries(DASH_VIEWS).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = key === view ? '' : 'none';
+  });
+  if (view === 'dashboard') renderDashboard();
+}
+
+// Render all tile previews. Called on initial load and on every return to dashboard
+// (so previews stay current if KO settings or other state changed in a drill-down).
+function renderDashboard() {
+  renderTilePreviewSummary();
+  renderTilePreviewBreakdown();
+  renderTilePreviewIndel();
+}
+
+// ── Tile 1: Summary — stacked bar, max MAX_BARS rows with fade if more ────────
+function renderTilePreviewSummary() {
+  const el = document.getElementById('tile-preview-summary');
+  if (!el) return;
+  const good = resultsData.filter(r => !r.failed);
+  if (!good.length) {
+    el.innerHTML = '<div class="dash-tile-empty-msg">Load a results folder to preview</div>';
+    return;
+  }
+
+  const n          = good.length;
+  const meanNHEJ   = good.reduce((s, r) => s + r.nhejPct,    0) / n;
+  const meanAligned = good.reduce((s, r) => s + r.alignedPct, 0) / n;
+  const failed     = resultsData.length - n;
+
+  // KO cell: show Full KO count when classification has run, otherwise show failed count
+  let stat4Val, stat4Label, stat4Color;
+  if (koEnabled() && resultsLoadedWithKO) {
+    const fullKO = good.filter(r => classifyKO(r).status === 'Full KO').length;
+    stat4Val   = fullKO;
+    stat4Label = 'Full KO';
+    stat4Color = '#3fb950';
+  } else {
+    stat4Val   = failed > 0 ? failed : '—';
+    stat4Label = 'Failed';
+    stat4Color = failed > 0 ? 'var(--error)' : 'var(--muted)';
+  }
+
+  const cell = (val, label, color) =>
+    `<div class="stat" style="flex:1;min-width:0">
+      <div class="stat-val" style="color:${color};font-size:20px">${val}</div>
+      <div class="stat-label">${label}</div>
+    </div>`;
+
+  el.innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;width:100%;align-items:center;justify-content:space-around;gap:8px 4px;padding:4px 0">
+      ${cell(n,                              'Samples',   'var(--accent)')}
+      ${cell(meanNHEJ.toFixed(1) + '%',      'Mean NHEJ', meanNHEJ > 0 ? 'var(--warn)' : 'var(--muted)')}
+      ${cell(meanAligned.toFixed(1) + '%',   'Aligned',   'var(--accent2)')}
+      ${cell(stat4Val,                        stat4Label,  stat4Color)}
+    </div>`;
+}
+
+// ── Tile 2: Editing Breakdown — all samples, bar height scaled to fit ─────────
+function renderTilePreviewBreakdown() {
+  const el = document.getElementById('tile-preview-breakdown');
+  if (!el) return;
+  const good = resultsData.filter(r => !r.failed);
+  if (!good.length) {
+    el.innerHTML = '<div class="dash-tile-empty-msg">Load a results folder to preview</div>';
+    return;
+  }
+  const barH   = Math.max(5, Math.min(14, Math.floor(140 / good.length) - 2));
+  el.innerHTML = tileBarChartSvg(good, 280, barH, 55);
+}
+
+// Shared compact stacked-bar SVG used by both summary/breakdown tile previews.
+// rows: array of result objects  barW: px width of bar area
+// barH: px height of each bar    labelW: px width reserved for sample name label
+function tileBarChartSvg(rows, barW, barH, labelW) {
+  const ROW_H  = barH + 4;
+  const PAD    = 4;
+  const totalH = rows.length * ROW_H + PAD;
+  const maxLbl = Math.floor(labelW / 6.5); // approx chars at font-size 9
+  let svg = `<svg width="100%" viewBox="0 0 ${labelW + barW} ${totalH}" style="display:block;overflow:visible" pointer-events="none">`;
+  rows.forEach((r, i) => {
+    const y   = i * ROW_H + PAD / 2;
+    const lbl = r.name.length > maxLbl ? r.name.slice(0, maxLbl - 1) + '…' : r.name;
+    svg += `<text x="${labelW - 5}" y="${y + barH / 2 + 3}" text-anchor="end" fill="#7d8590" font-size="9" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
+    let x = labelW;
+    const seg = (pct, fill) => {
+      const w = (pct / 100) * barW;
+      if (w < 0.5) return;
+      svg += `<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${barH}" fill="${fill}" rx="1"/>`;
+      x += w;
+    };
+    seg(r.refUnmodifiedPct, '#7d8590');
+    seg(r.nhejPct,          '#f85149');
+    if (r.hasHDR)        seg(r.hdrPct,       '#3fb950');
+    if (r.ambiguous > 0) seg(r.ambiguousPct, '#d29922');
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// ── Tile 3: Indel Distribution — single representative sample (highest NHEJ%) ─
+function renderTilePreviewIndel() {
+  const el = document.getElementById('tile-preview-indel');
+  if (!el) return;
+  if (!resultsData.length) {
+    el.innerHTML = '<div class="dash-tile-empty-msg">Load a results folder to preview</div>';
+    return;
+  }
+  const withData = resultsData.filter(r => !r.failed && r.hasIndelData);
+  if (!withData.length) {
+    el.innerHTML = '<div class="dash-tile-empty-msg">No indel histogram data found</div>';
+    return;
+  }
+  // Representative sample: highest NHEJ%
+  const rep      = withData.reduce((best, r) => r.nhejPct > best.nhejPct ? r : best, withData[0]);
+  const allSizes = withData.flatMap(r => r.indelData.map(d => d.size));
+  const xMin     = Math.min(...allSizes);
+  const xMax     = Math.max(...allSizes);
+  el.innerHTML   = drawIndelSvg(rep, xMin, xMax, 260, 140, 28, 6, 8, 20, false);
 }
 
 function renderParseErrors() {
@@ -1849,7 +2112,7 @@ async function runKOOnDemand(showFullSpinner = true) {
     console.error('KO classification failed:', e);
   } finally {
     hideSpinner();
-    document.getElementById('results-content').style.display = 'block';
+    if (resultsData.length) showResultsView(resultsView);
   }
 }
 
@@ -1945,9 +2208,12 @@ function showSpinner() {
   const el = document.getElementById('results-loading');
   el.classList.remove('fade-out');
   el.style.display = 'flex';
-  document.getElementById('results-content').style.display = 'none';
-  document.getElementById('results-empty').style.display   = 'none';
-  document.getElementById('results-errors').style.display  = 'none';
+  ['results-dashboard','results-summary-view','results-breakdown-view',
+   'results-indel-view','ko-summary-bar'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.style.display = 'none';
+  });
+  document.getElementById('results-empty').style.display  = 'none';
+  document.getElementById('results-errors').style.display = 'none';
 }
 
 function hideSpinner() {
