@@ -433,8 +433,7 @@
   }
 
   /* ─── 18. Comparison panel ─── */
-  .check-col { width: 32px; text-align: center; padding: 4px 6px !important; }
-  .row-check  { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; display: block; margin: 0 auto; }
+  .check-col { width: 24px; text-align: center; padding: 4px 2px !important; }
 
   tr.results-row-selectable { cursor: pointer; }
   tr.results-row-selectable.selected td { background: rgba(88,166,255,0.06); }
@@ -1635,7 +1634,7 @@ function renderResultsTable() {
   resultsData.forEach((r, idx) => {
     const isSel     = selectedIndices.has(idx);
     const selClass  = isSel ? ' selected' : '';
-    const checkHtml = `<td class="check-col"><input type="checkbox" class="row-check"${isSel ? ' checked' : ''} onclick="event.stopPropagation();toggleSelection(${idx})"></td>`;
+    const checkHtml = `<td class="check-col" style="color:var(--accent);font-size:12px">${isSel ? '✓' : ''}</td>`;
 
     if (r.failed) {
       html += `<tr id="result-row-${idx}" class="results-row-selectable${selClass}" onclick="toggleSelection(${idx})">
