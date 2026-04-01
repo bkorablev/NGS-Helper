@@ -479,7 +479,21 @@
   .cmp-table tr:last-child td { border-bottom: none; }
 
   /* push page content up so sticky panel doesn't obscure it */
-  body.cmp-open main { padding-bottom: 280px; }
+  body.cmp-open    main { padding-bottom: 280px; }
+  body.bd-cmp-open main { padding-bottom: 280px; }
+
+  #breakdown-comparison-panel {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 2px solid var(--accent);
+    z-index: 200;
+    box-shadow: 0 -6px 32px rgba(0,0,0,0.5);
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+  #breakdown-comparison-panel.bd-visible { display: block; }
 
   /* ─── 19. Indel size distribution ─── */
   .indel-grid {
@@ -924,6 +938,10 @@
  *                                   renderTilePreviewSummary,
  *                                   renderTilePreviewBreakdown,
  *                                   renderTilePreviewIndel, tileBarChartSvg
+ *  Section 15: Breakdown comparison — toggleBreakdownComparison,
+ *                                   clearBreakdownComparison,
+ *                                   renderBreakdownComparisonPanel,
+ *                                   exportBreakdownComparison
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1356,9 +1374,10 @@ function copyCmd() {
 let resultsData        = [];
 let resultsLoadedWithKO = false;
 const parseErrors      = [];
-let indelYAxisMode     = 'count'; // 'count' | 'pct'
-let indelExpandedIdx   = null;
-let resultsView        = 'dashboard'; // 'dashboard' | 'summary' | 'breakdown' | 'indel'
+let indelYAxisMode            = 'count'; // 'count' | 'pct'
+let indelExpandedIdx          = null;
+let resultsView               = 'dashboard'; // 'dashboard' | 'summary' | 'breakdown' | 'indel'
+let breakdownSelectedSamples  = new Set();
 
 function loadResults(files) {
   const fileArr = Array.from(files);
@@ -1367,6 +1386,7 @@ function loadResults(files) {
   indelExpandedIdx = null;
   resultsView      = 'dashboard';
   selectedIndices.clear();
+  breakdownSelectedSamples.clear();
   renderComparisonPanel();
 
   if (fileArr.length) {
@@ -1669,9 +1689,16 @@ function renderResultsCharts() {
   if (!good.length) { document.getElementById('results-chart-wrap').innerHTML = ''; return; }
   const BAR_W = 560, BAR_H = 22, LABEL_W = 190, ROW_H = 38, PAD = 10;
   let svg = `<svg width="100%" viewBox="0 0 ${LABEL_W + BAR_W} ${good.length * ROW_H + PAD}" style="display:block">`;
-  good.forEach((r, idx) => {
-    const y     = idx * ROW_H + PAD / 2;
+  good.forEach((r, i) => {
+    const resultIdx = resultsData.indexOf(r);
+    const y     = i * ROW_H + PAD / 2;
+    const isSel = breakdownSelectedSamples.has(resultIdx);
     const label = r.name.length > 24 ? r.name.slice(0, 23) + '…' : r.name;
+
+    // Wrap row in <g> — firstElementChild is the hover rect (toggle opacity on hover)
+    svg += `<g style="cursor:pointer" onclick="toggleBreakdownComparison(${resultIdx})" onmouseover="this.firstElementChild.style.opacity=1" onmouseout="this.firstElementChild.style.opacity=0">`;
+    // Hover highlight behind bars
+    svg += `<rect x="0" y="${y}" width="${LABEL_W + BAR_W}" height="${BAR_H}" fill="rgba(255,255,255,0.04)" style="opacity:0"/>`;
     svg += `<text x="${LABEL_W - 8}" y="${y + BAR_H/2 + 4}" text-anchor="end" fill="#7d8590" font-size="11" font-family="IBM Plex Mono,monospace">${label}</text>`;
     let x = LABEL_W;
     const seg = (pctVal, fill, lbl) => {
@@ -1685,6 +1712,9 @@ function renderResultsCharts() {
     seg(r.nhejPct,          '#f85149', r.nhejPct.toFixed(1)          + '%');
     if (r.hasHDR)        seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');
     if (r.ambiguous > 0) seg(r.ambiguousPct, '#d29922', r.ambiguousPct.toFixed(1) + '%');
+    // 3px accent bar on the left edge when selected
+    if (isSel) svg += `<rect x="0" y="${y}" width="3" height="${BAR_H}" fill="#58a6ff"/>`;
+    svg += `</g>`;
   });
   svg += '</svg>';
   document.getElementById('results-chart-wrap').innerHTML = svg;
@@ -1854,6 +1884,7 @@ function showResultsView(view) {
     if (el) el.style.display = key === view ? '' : 'none';
   });
   if (view === 'dashboard') renderDashboard();
+  renderBreakdownComparisonPanel(); // show/hide based on view + selection state
 }
 
 // Render all tile previews. Called on initial load and on every return to dashboard
@@ -1969,6 +2000,121 @@ function renderTilePreviewIndel() {
   const xMin     = Math.min(...allSizes);
   const xMax     = Math.max(...allSizes);
   el.innerHTML   = drawIndelSvg(rep, xMin, xMax, 260, 140, 28, 6, 8, 20, false);
+}
+
+// ─── Section 15: Editing Breakdown comparison ─────────────────────────────────
+
+// Toggle a sample in/out of the breakdown comparison set and re-render.
+function toggleBreakdownComparison(idx) {
+  if (breakdownSelectedSamples.has(idx)) {
+    breakdownSelectedSamples.delete(idx);
+  } else {
+    breakdownSelectedSamples.add(idx);
+  }
+  renderResultsCharts();
+  renderBreakdownComparisonPanel();
+}
+
+// Clear all breakdown selections and hide the panel.
+function clearBreakdownComparison() {
+  breakdownSelectedSamples.clear();
+  renderResultsCharts();
+  renderBreakdownComparisonPanel();
+}
+
+// Show/hide and populate the breakdown comparison panel.
+// Only visible when resultsView === 'breakdown' AND there are selections.
+function renderBreakdownComparisonPanel() {
+  const panel = document.getElementById('breakdown-comparison-panel');
+  if (!panel) return;
+
+  if (resultsView !== 'breakdown' || breakdownSelectedSamples.size === 0) {
+    panel.classList.remove('bd-visible');
+    document.body.classList.remove('bd-cmp-open');
+    return;
+  }
+
+  panel.classList.add('bd-visible');
+  document.body.classList.add('bd-cmp-open');
+
+  const selected = [...breakdownSelectedSamples]
+    .sort((a, b) => a - b)
+    .map(i => resultsData[i])
+    .filter(Boolean);
+  const n = selected.length;
+
+  document.getElementById('bd-cmp-title').textContent =
+    `Comparing ${n} sample${n !== 1 ? 's' : ''}`;
+
+  // Removable chips — clicking × deselects that sample
+  document.getElementById('bd-cmp-chips').innerHTML = selected.map(r => {
+    const idx = resultsData.indexOf(r);
+    return `<span style="background:rgba(88,166,255,0.12);color:var(--accent);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono);display:inline-flex;align-items:center;gap:4px">${r.name}<span style="cursor:pointer;opacity:0.7;margin-left:2px" onclick="toggleBreakdownComparison(${idx})">×</span></span>`;
+  }).join('');
+
+  // Side-by-side stacked bar chart of selected samples only
+  const BAR_W = 500, BAR_H = 28, LABEL_W = 180, ROW_H = 44, PAD = 8;
+  let svg = `<svg width="100%" viewBox="0 0 ${LABEL_W + BAR_W} ${selected.length * ROW_H + PAD}" style="display:block">`;
+  selected.forEach((r, i) => {
+    const y     = i * ROW_H + PAD / 2;
+    const label = r.name.length > 22 ? r.name.slice(0, 21) + '…' : r.name;
+    svg += `<text x="${LABEL_W - 8}" y="${y + BAR_H/2 + 4}" text-anchor="end" fill="#7d8590" font-size="11" font-family="IBM Plex Mono,monospace">${label}</text>`;
+    let x = LABEL_W;
+    const seg = (pct, fill, lbl) => {
+      const w = (pct / 100) * BAR_W;
+      if (w < 0.5) return;
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="${BAR_H}" fill="${fill}"/>`;
+      if (w > 38) svg += `<text x="${x + w/2}" y="${y + BAR_H/2 + 5}" text-anchor="middle" fill="#fff" font-size="10" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
+      x += w;
+    };
+    seg(r.refUnmodifiedPct, '#7d8590', r.refUnmodifiedPct.toFixed(1) + '%');
+    seg(r.nhejPct,          '#f85149', r.nhejPct.toFixed(1)          + '%');
+    if (r.hasHDR)        seg(r.hdrPct,       '#3fb950', r.hdrPct.toFixed(1)       + '%');
+    if (r.ambiguous > 0) seg(r.ambiguousPct, '#d29922', r.ambiguousPct.toFixed(1) + '%');
+  });
+  svg += '</svg>';
+
+  // Build legend — only include HDR/Ambiguous rows when relevant to the selection
+  const anyHDR = selected.some(r => r.hasHDR);
+  const anyAmb = selected.some(r => r.ambiguous > 0);
+  const legendItem = (color, label) =>
+    `<div style="display:flex;align-items:center;gap:6px">
+      <div style="width:10px;height:10px;border-radius:2px;background:${color};flex-shrink:0"></div>
+      <span>${label}</span>
+    </div>`;
+  const legend =
+    `<div style="display:flex;flex-direction:column;gap:8px;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--muted);padding-right:12px;flex-shrink:0">
+      ${legendItem('#7d8590', 'Unmodified')}
+      ${legendItem('#f85149', 'NHEJ')}
+      ${anyHDR ? legendItem('#3fb950', 'HDR') : ''}
+      ${anyAmb ? legendItem('#d29922', 'Ambiguous') : ''}
+    </div>`;
+
+  document.getElementById('bd-cmp-chart').innerHTML =
+    `<div style="display:flex;align-items:center">${legend}${svg}</div>`;
+}
+
+// Export selected breakdown samples to Excel.
+function exportBreakdownComparison() {
+  if (!breakdownSelectedSamples.size) return;
+  const selected = [...breakdownSelectedSamples]
+    .sort((a, b) => a - b)
+    .map(i => resultsData[i])
+    .filter(Boolean);
+
+  const anyHDR = selected.some(r => r.hasHDR);
+  const headers = ['Sample', 'Aligned %', 'Unmodified %', 'NHEJ %'];
+  if (anyHDR) headers.push('HDR %', 'Ambiguous %');
+
+  const rows = [headers, ...selected.map(r => {
+    const row = [r.name, r.alignedPct, r.refUnmodifiedPct.toFixed(1), r.nhejPct.toFixed(1)];
+    if (anyHDR) row.push(r.hasHDR ? r.hdrPct.toFixed(1) : '', r.ambiguous > 0 ? r.ambiguousPct.toFixed(1) : '');
+    return row;
+  })];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Breakdown Comparison');
+  XLSX.writeFile(wb, 'breakdown_comparison.xlsx');
 }
 
 function renderParseErrors() {
@@ -2374,6 +2520,23 @@ function exportComparison() {
   XLSX.writeFile(wb, 'crispresso_comparison.xlsx');
 }
 </script>
+
+<!-- ════ BREAKDOWN COMPARISON PANEL ════ -->
+<div id="breakdown-comparison-panel">
+  <div class="cmp-header" style="flex-wrap:wrap;gap:8px">
+    <div style="flex:1;min-width:0">
+      <span class="cmp-title" id="bd-cmp-title">Comparing 0 samples</span>
+      <div id="bd-cmp-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </div>
+    <div class="cmp-actions">
+      <button class="btn btn-secondary" onclick="exportBreakdownComparison()" style="padding:6px 14px;font-size:12px">⬇ Export comparison</button>
+      <button class="btn btn-secondary" onclick="clearBreakdownComparison()" style="padding:6px 14px;font-size:12px">Clear all</button>
+    </div>
+  </div>
+  <div class="cmp-body">
+    <div id="bd-cmp-chart"></div>
+  </div>
+</div>
 
 <!-- ════ COMPARISON PANEL ════ -->
 <div id="comparison-panel">
