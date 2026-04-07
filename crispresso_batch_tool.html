@@ -1504,18 +1504,20 @@ function loadResults(files) {
     const isDelHist      = fname === 'Deletion_histogram.txt';
     const isRefIndelHist = fname === 'Reference.Indel_histogram.txt';
     const isIndelHist    = fname === 'Indel_histogram.txt';
-    const isRefAlleles   = fname.startsWith('Reference.Alleles_frequency_table');
-    const isAlleles      = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
-    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefAlleles && !isAlleles) return;
-    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, indelHistFile: null };
-    if (isQuant)                                         groups[subKey].quantFile    = f;
-    else if (isMap)                                      groups[subKey].mapFile      = f;
-    else if (isRefHist)                                  groups[subKey].delHistFile  = f;
-    else if (isDelHist && !groups[subKey].delHistFile)   groups[subKey].delHistFile  = f;
-    else if (isRefIndelHist)                             groups[subKey].indelHistFile = f;
-    else if (isIndelHist && !groups[subKey].indelHistFile) groups[subKey].indelHistFile = f;
-    else if (isRefAlleles)                               groups[subKey].allelesFile  = f;
-    else if (isAlleles && !groups[subKey].allelesFile)   groups[subKey].allelesFile  = f;
+    const isRefAlleles    = fname.startsWith('Reference.Alleles_frequency_table');
+    const isSgRNAAlleles  = fname.startsWith('Alleles_frequency_table_around_sgRNA_') && fname.endsWith('.txt');
+    const isAlleles       = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
+    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefAlleles && !isSgRNAAlleles && !isAlleles) return;
+    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, sgRNAAllelesFile: null, zipAllelesFile: null, indelHistFile: null };
+    if (isQuant)                                                       groups[subKey].quantFile       = f;
+    else if (isMap)                                                    groups[subKey].mapFile         = f;
+    else if (isRefHist)                                                groups[subKey].delHistFile     = f;
+    else if (isDelHist    && !groups[subKey].delHistFile)              groups[subKey].delHistFile     = f;
+    else if (isRefIndelHist)                                           groups[subKey].indelHistFile   = f;
+    else if (isIndelHist  && !groups[subKey].indelHistFile)            groups[subKey].indelHistFile   = f;
+    else if (isRefAlleles)                                             groups[subKey].allelesFile     = f;  // HDR: Reference.* wins outright
+    else if (isSgRNAAlleles && !groups[subKey].sgRNAAllelesFile)       groups[subKey].sgRNAAllelesFile = f; // preferred for standard runs
+    else if (isAlleles    && !groups[subKey].zipAllelesFile)           groups[subKey].zipAllelesFile  = f;  // last resort fallback
   });
 
   const subfolders = Object.keys(groups).sort();
@@ -1532,7 +1534,7 @@ function loadResults(files) {
 
   Promise.all(subfolders.map(key => {
     const g = groups[key];
-    return parseSample(g.subName, { ...g, parseKO: false }).then(r => {
+    return parseSample(g.subName, { ...g, allelesFile: g.allelesFile || g.sgRNAAllelesFile || g.zipAllelesFile || null, parseKO: false }).then(r => {
       parsed++;
       if (parsed < total) setLoadingMsg(`Parsing sample ${parsed + 1} of ${total}…`);
       else                setLoadingMsg('Building summary…');
@@ -1672,13 +1674,18 @@ async function parseAllelesIntoResult(result, file) {
       const nDel       = parseInt(row['n_deleted'])  || 0;
       const nIns       = parseInt(row['n_inserted']) || 0;
       const nMut       = parseInt(row['n_mutated'])  || 0;
-      const freq       = parseFloat(row['%Reads'])   || 0;
+      const rawReads   = parseInt(row['#Reads']) || 0;
+      const freq       = result.alignedAllAmplicons > 0
+        ? (rawReads / result.alignedAllAmplicons) * 100
+        : parseFloat(row['%Reads']) || 0;
       const readStatus = (row['Read_Status'] || '').trim();
+      // Support both formats: zip uses Read_Status='UNMODIFIED', sgRNA file uses Unedited='True'
+      const isUnmodified = readStatus === 'UNMODIFIED' || (row['Unedited'] || '').trim() === 'True';
       // KO clustering
       const key = (nDel === 0 && nIns === 0)
-        ? `0_0_${readStatus === 'UNMODIFIED' ? 'WT' : 'SUB'}`
+        ? `0_0_${isUnmodified ? 'WT' : 'SUB'}`
         : `${nDel}_${nIns}`;
-      if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus };
+      if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus: isUnmodified ? 'UNMODIFIED' : readStatus };
       clusters[key].freq += freq;
       clusters[key].nMut  = Math.max(clusters[key].nMut, nMut);
       // Raw sequence rows for viewer
