@@ -1668,7 +1668,6 @@ async function parseAllelesIntoResult(result, file) {
     const text     = await readAllelesText(file);
     const rows     = parseTSV(text);
     const clusters = {};
-    const rawRows  = [];
     rows.forEach(row => {
       if (row['Reference_Name'] !== undefined && row['Reference_Name'] !== 'Reference') return;
       const nDel       = parseInt(row['n_deleted'])  || 0;
@@ -1681,24 +1680,23 @@ async function parseAllelesIntoResult(result, file) {
       const readStatus = (row['Read_Status'] || '').trim();
       // Support both formats: zip uses Read_Status='UNMODIFIED', sgRNA file uses Unedited='True'
       const isUnmodified = readStatus === 'UNMODIFIED' || (row['Unedited'] || '').trim() === 'True';
-      // KO clustering
       const key = (nDel === 0 && nIns === 0)
         ? `0_0_${isUnmodified ? 'WT' : 'SUB'}`
         : `${nDel}_${nIns}`;
-      if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus: isUnmodified ? 'UNMODIFIED' : readStatus };
-      clusters[key].freq += freq;
-      clusters[key].nMut  = Math.max(clusters[key].nMut, nMut);
-      // Raw sequence rows for viewer
-      rawRows.push({
+      if (!clusters[key]) clusters[key] = {
+        nDel, nIns, nMut: 0, freq: 0, reads: 0,
+        readStatus: isUnmodified ? 'UNMODIFIED' : readStatus,
+        // Representative sequence: first (highest-reads) row per cluster
         alignedSeq: row['Aligned_Sequence']   || '',
         refSeq:     row['Reference_Sequence'] || '',
-        freq, nDel, nIns, nMut,
-        reads:    parseInt(row['#Reads']) || 0,
-        unedited: readStatus === 'UNMODIFIED',
-      });
+        unedited:   isUnmodified,
+      };
+      clusters[key].freq  += freq;
+      clusters[key].reads += rawReads;
+      clusters[key].nMut   = Math.max(clusters[key].nMut, nMut);
     });
-    result.topAlleles     = Object.values(clusters).sort((a, b) => b.freq - a.freq);
-    result.rawTopAlleles  = rawRows.slice(0, 50); // already sorted by CRISPResso (desc freq)
+    result.topAlleles    = Object.values(clusters).sort((a, b) => b.freq - a.freq);
+    result.rawTopAlleles = result.topAlleles.slice(0, 50);
     result.hasAllelesData = true;
   } catch (e) {
     parseErrors.push(`${result.name}: failed to read alleles frequency table — ${e.message}`);
