@@ -582,6 +582,56 @@
     transition: background 0.15s ease;
   }
   .dash-tile:hover .dash-preview-fade { background: linear-gradient(transparent, var(--surface2)); }
+
+  /* ─── 21. Allele sequence viewer ─── */
+  .allele-sample-block {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .allele-sample-header {
+    background: var(--surface2);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .allele-sample-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+    flex: 1;
+  }
+  .allele-sample-stats {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .allele-sample-body { padding: 12px 14px; overflow-x: auto; }
+  .allele-seq-table {
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .allele-seq-table td { padding: 3px 0; vertical-align: middle; }
+  .allele-seq-table .seq-label { color: var(--muted); font-size: 11px; padding-right: 14px; min-width: 90px; }
+  .allele-seq-table .seq-freq  { color: var(--text);  font-size: 11px; padding-left: 14px;  min-width: 58px; }
+  .allele-seq-table .seq-reads { color: var(--muted); font-size: 10px; padding-left: 8px; white-space: nowrap; }
+  .allele-ref-row td { color: var(--muted); }
+  .seq-base { display: inline-block; width: 1ch; text-align: center; }
+  .seq-base.base-del { background: rgba(248,81,73,0.30);  color: #f85149; border-radius: 1px; }
+  .seq-base.base-ins { background: rgba(63,185,80,0.28);  color: #3fb950; border-radius: 1px; }
+  .seq-base.base-sub { background: rgba(210,153,34,0.30); color: #d29922; border-radius: 1px; }
+  .allele-top-n-ctrl {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -807,6 +857,18 @@
         </div>
       </div>
 
+      <!-- Tile 4: Top Alleles -->
+      <div class="dash-tile" onclick="loadAndShowAlleles()">
+        <div class="dash-tile-header">
+          <div class="dash-tile-icon"></div>
+          <div class="dash-tile-title">Top Alleles</div>
+          <div class="dash-tile-desc">Sequence-level view of the most frequent editing outcomes</div>
+        </div>
+        <div class="dash-tile-preview" id="tile-preview-alleles">
+          <div class="dash-tile-empty-msg">Load a results folder to preview</div>
+        </div>
+      </div>
+
     </div><!-- /.dash-grid -->
   </div><!-- /#results-dashboard -->
 
@@ -888,6 +950,29 @@
         </div>
       </div>
       <div id="indel-chart-area"></div>
+    </div>
+  </div>
+
+  <!-- ════ Drill-down: Top Alleles ════ -->
+  <div id="results-alleles-view" style="display:none">
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin-bottom:0">Top allele sequences</div>
+        <div class="allele-top-n-ctrl">
+          Show top
+          <input type="number" id="allele-top-n" value="10" min="1" max="50" style="width:55px;text-align:center" oninput="renderAllelesView()">
+          alleles per sample
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px;font-family:var(--mono)">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(248,81,73,0.45);vertical-align:middle;margin-right:4px"></span>Deletion</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(63,185,80,0.40);vertical-align:middle;margin-right:4px"></span>Insertion</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(210,153,34,0.45);vertical-align:middle;margin-right:4px"></span>Substitution</span>
+      </div>
+      <div id="alleles-chart-area"></div>
     </div>
   </div>
 
@@ -1473,7 +1558,7 @@ async function parseSample(subfolder, files) {
     hasDelHist: false, delFsReads: 0, delInFrameReads: 0,
     delTotalReads: 0, delFsPct: 0, largeDels: [],
     hasIndelData: false, indelData: [],
-    hasAllelesData: false, topAlleles: []
+    hasAllelesData: false, topAlleles: [], rawTopAlleles: []
   };
 
   const safeRead = (file, label) =>
@@ -1574,21 +1659,32 @@ async function parseAllelesIntoResult(result, file) {
     const text     = await readAllelesText(file);
     const rows     = parseTSV(text);
     const clusters = {};
+    const rawRows  = [];
     rows.forEach(row => {
-      if (row['Reference_Name'] !== 'Reference') return;
+      if (row['Reference_Name'] !== undefined && row['Reference_Name'] !== 'Reference') return;
       const nDel       = parseInt(row['n_deleted'])  || 0;
       const nIns       = parseInt(row['n_inserted']) || 0;
       const nMut       = parseInt(row['n_mutated'])  || 0;
       const freq       = parseFloat(row['%Reads'])   || 0;
       const readStatus = (row['Read_Status'] || '').trim();
+      // KO clustering
       const key = (nDel === 0 && nIns === 0)
         ? `0_0_${readStatus === 'UNMODIFIED' ? 'WT' : 'SUB'}`
         : `${nDel}_${nIns}`;
       if (!clusters[key]) clusters[key] = { nDel, nIns, nMut: 0, freq: 0, readStatus };
       clusters[key].freq += freq;
       clusters[key].nMut  = Math.max(clusters[key].nMut, nMut);
+      // Raw sequence rows for viewer
+      rawRows.push({
+        alignedSeq: row['Aligned_Sequence']   || '',
+        refSeq:     row['Reference_Sequence'] || '',
+        freq, nDel, nIns, nMut,
+        reads:    parseInt(row['#Reads']) || 0,
+        unedited: readStatus === 'UNMODIFIED',
+      });
     });
     result.topAlleles     = Object.values(clusters).sort((a, b) => b.freq - a.freq);
+    result.rawTopAlleles  = rawRows.slice(0, 50); // already sorted by CRISPResso (desc freq)
     result.hasAllelesData = true;
   } catch (e) {
     parseErrors.push(`${result.name}: failed to read alleles frequency table — ${e.message}`);
@@ -1873,6 +1969,7 @@ const DASH_VIEWS = {
   summary:   'results-summary-view',
   breakdown: 'results-breakdown-view',
   indel:     'results-indel-view',
+  alleles:   'results-alleles-view',
 };
 
 // Show one view and hide all others. Refreshes tile previews when returning to dashboard.
@@ -1883,6 +1980,7 @@ function showResultsView(view) {
     if (el) el.style.display = key === view ? '' : 'none';
   });
   if (view === 'dashboard') renderDashboard();
+  if (view === 'alleles')   renderAllelesView();
   renderBreakdownComparisonPanel(); // show/hide based on view + selection state
 }
 
@@ -1893,6 +1991,7 @@ function renderDashboard() {
   renderTilePreviewSummary();
   renderTilePreviewBreakdown();
   renderTilePreviewIndel();
+  renderTilePreviewAlleles();
 }
 
 // ── Tile 1: Summary — stacked bar, max MAX_BARS rows with fade if more ────────
@@ -2365,7 +2464,7 @@ function showSpinner() {
   el.classList.remove('fade-out');
   el.style.display = 'flex';
   ['results-dashboard','results-summary-view','results-breakdown-view',
-   'results-indel-view'].forEach(id => {
+   'results-indel-view','results-alleles-view'].forEach(id => {
     const e = document.getElementById(id); if (e) e.style.display = 'none';
   });
   document.getElementById('results-empty').style.display  = 'none';
@@ -2488,6 +2587,170 @@ function renderComparisonPanel() {
 
   document.getElementById('cmp-thead').innerHTML = thead;
   document.getElementById('cmp-tbody').innerHTML = tbody;
+}
+
+// ─── Section 16: Top Alleles viewer ──────────────────────────────────────────
+
+// Load allele data for any samples that still need it, then navigate to the view.
+async function loadAndShowAlleles() {
+  const needLoad = resultsData.filter(r => !r.failed && !r.hasAllelesData && r.allelesFileRef);
+  if (needLoad.length) {
+    showSpinner();
+    setLoadingMsg('Loading allele sequences…');
+    await new Promise(r => setTimeout(r, 30));
+    try {
+      await Promise.all(needLoad.map(r => parseAllelesIntoResult(r, r.allelesFileRef)));
+    } catch (e) {
+      console.error('Allele loading error:', e);
+    }
+    hideSpinner();
+  }
+  showResultsView('alleles');
+}
+
+// Render all sample allele blocks into #alleles-chart-area.
+function renderAllelesView() {
+  const area = document.getElementById('alleles-chart-area');
+  if (!area) return;
+  const topNEl = document.getElementById('allele-top-n');
+  const topN   = Math.max(1, parseInt(topNEl ? topNEl.value : '10') || 10);
+
+  const withData = resultsData.filter(r => !r.failed && r.hasAllelesData && r.rawTopAlleles && r.rawTopAlleles.length);
+  if (!withData.length) {
+    const anyRef = resultsData.some(r => !r.failed && r.allelesFileRef);
+    area.innerHTML = `<div style="color:var(--muted);font-family:var(--mono);font-size:13px;text-align:center;padding:32px 0">
+      ${anyRef ? 'No allele sequence data loaded.' : 'No Alleles_frequency_table files found in sample subfolders.'}
+    </div>`;
+    return;
+  }
+  area.innerHTML = withData.map(r => renderSampleAlleles(r, topN)).join('');
+}
+
+// Render one sample's allele block.
+function renderSampleAlleles(r, topN) {
+  const alleles = r.rawTopAlleles.slice(0, topN);
+
+  // Canonical reference: prefer refSeq from an allele with no insertions (no gap in refSeq).
+  const canonRef = escapeHtml(
+    (alleles.find(a => a.nIns === 0)?.refSeq || alleles[0]?.refSeq || '').replace(/-/g, '')
+  );
+
+  let rows = '';
+
+  // Reference row
+  rows += `<tr class="allele-ref-row">
+    <td class="seq-label">Reference</td>
+    <td><span style="font-family:var(--mono);color:var(--muted)">${canonRef}</span></td>
+    <td class="seq-freq"></td>
+    <td class="seq-reads"></td>
+  </tr>`;
+
+  alleles.forEach(a => {
+    const label = a.unedited
+      ? 'Unmodified'
+      : a.nDel > 0 && a.nIns > 0 ? `\u2212${a.nDel}bp / +${a.nIns}bp`
+      : a.nDel > 0               ? `\u2212${a.nDel}bp del`
+      : a.nIns > 0               ? `+${a.nIns}bp ins`
+      : a.nMut > 0               ? `${a.nMut} sub`
+      : 'Unmodified';
+
+    const freqColor = a.unedited ? 'var(--muted)' : a.freq > 20 ? 'var(--text)' : 'var(--warn)';
+
+    rows += `<tr>
+      <td class="seq-label">${escapeHtml(label)}</td>
+      <td>${renderSequenceAlignment(a.alignedSeq, a.refSeq)}</td>
+      <td class="seq-freq" style="color:${freqColor}">${a.freq.toFixed(1)}%</td>
+      <td class="seq-reads">${a.reads.toLocaleString()} reads</td>
+    </tr>`;
+  });
+
+  return `<div class="allele-sample-block">
+    <div class="allele-sample-header">
+      <span class="allele-sample-name">${escapeHtml(r.name)}</span>
+      <span class="allele-sample-stats">
+        <span>NHEJ ${r.nhejPct.toFixed(1)}%</span>
+        <span>Unmodified ${r.refUnmodifiedPct.toFixed(1)}%</span>
+        <span>${r.rawTopAlleles.length} allele types</span>
+      </span>
+    </div>
+    <div class="allele-sample-body">
+      <table class="allele-seq-table"><tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+
+// Render an aligned sequence as a series of color-coded spans.
+// Compares alignedSeq against refSeq character by character:
+//   alignedSeq[i] === '-' and refSeq[i] !== '-'  → deletion  (red)
+//   refSeq[i]     === '-' and alignedSeq[i] !== '-' → insertion (green)
+//   both have a base but they differ               → substitution (yellow)
+//   match                                          → plain muted text
+function renderSequenceAlignment(alignedSeq, refSeq) {
+  if (!alignedSeq && !refSeq) return '';
+  const len = Math.max(alignedSeq.length, refSeq.length);
+  let html = '';
+  for (let i = 0; i < len; i++) {
+    const a = alignedSeq[i] || '-';
+    const r = refSeq[i]     || '-';
+    if (a === '-' && r !== '-') {
+      html += `<span class="seq-base base-del">-</span>`;
+    } else if (r === '-' && a !== '-') {
+      html += `<span class="seq-base base-ins">${a}</span>`;
+    } else if (a !== r) {
+      html += `<span class="seq-base base-sub">${a}</span>`;
+    } else {
+      html += `<span class="seq-base" style="color:var(--muted)">${a}</span>`;
+    }
+  }
+  return html;
+}
+
+// ── Tile 4 preview: top alleles of the most-edited sample with allele data ─────
+function renderTilePreviewAlleles() {
+  const el = document.getElementById('tile-preview-alleles');
+  if (!el) return;
+
+  const withData = resultsData.filter(r => !r.failed && r.hasAllelesData && r.rawTopAlleles?.length);
+  if (!withData.length) {
+    const anyRef = resultsData.some(r => !r.failed && r.allelesFileRef);
+    el.innerHTML = `<div class="dash-tile-empty-msg">${anyRef ? 'Click to load allele sequences' : 'Load a results folder to preview'}</div>`;
+    return;
+  }
+
+  // Representative sample: highest NHEJ%
+  const rep     = withData.reduce((best, r) => r.nhejPct > best.nhejPct ? r : best, withData[0]);
+  const alleles = rep.rawTopAlleles.slice(0, 7);
+
+  const BAR_W = 150, ROW_H = 18, PAD = 4, LABEL_W = 74;
+  const totalH = alleles.length * ROW_H + PAD;
+  let svg = `<svg width="100%" viewBox="0 0 ${LABEL_W + BAR_W + 42} ${totalH}" style="display:block" pointer-events="none">`;
+
+  alleles.forEach((a, i) => {
+    const y   = i * ROW_H + PAD / 2;
+    const barH = 11;
+    const by  = y + (ROW_H - barH) / 2;
+    const bw  = Math.max((a.freq / 100) * BAR_W, 0.5);
+
+    const label = a.unedited        ? 'Unmodified'
+      : a.nDel > 0 && a.nIns > 0   ? `\u2212${a.nDel}/+${a.nIns}`
+      : a.nDel > 0                  ? `\u2212${a.nDel}bp`
+      : a.nIns > 0                  ? `+${a.nIns}bp ins`
+      : a.nMut > 0                  ? `${a.nMut} sub`
+      : 'Unmodified';
+    const lbl  = label.length > 11 ? label.slice(0, 10) + '\u2026' : label;
+    const fill = a.unedited ? '#7d8590' : (a.nDel > 0 || a.nIns > 0) ? '#f85149' : '#d29922';
+
+    svg += `<text x="${LABEL_W - 5}" y="${by + barH/2 + 3.5}" text-anchor="end" fill="#7d8590" font-size="9" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
+    svg += `<rect x="${LABEL_W}" y="${by}" width="${bw.toFixed(1)}" height="${barH}" fill="${fill}" rx="1"/>`;
+    svg += `<text x="${LABEL_W + bw + 4}" y="${by + barH/2 + 3.5}" text-anchor="start" fill="#7d8590" font-size="9" font-family="IBM Plex Mono,monospace">${a.freq.toFixed(1)}%</text>`;
+  });
+
+  svg += '</svg>';
+  el.innerHTML = svg + `<div class="dash-preview-fade"></div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function exportComparison() {
