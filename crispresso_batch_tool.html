@@ -623,11 +623,18 @@
   .allele-seq-table .seq-label { color: var(--muted); font-size: 11px; padding-right: 14px; min-width: 90px; }
   .allele-seq-table .seq-freq  { color: var(--text);  font-size: 11px; padding-left: 14px;  min-width: 58px; }
   .allele-seq-table .seq-reads { color: var(--muted); font-size: 10px; padding-left: 8px; white-space: nowrap; }
-  .allele-ref-row td { color: var(--muted); }
+  .allele-ref-row { background: var(--surface2); }
+  .allele-ref-row td { color: var(--text); padding-bottom: 10px; border-bottom: 2px solid var(--border); }
+  .allele-seq-table tr:nth-child(2) td { padding-top: 10px; }
   .seq-base { display: inline-block; width: 1ch; text-align: center; }
-  .seq-base.base-del { background: rgba(248,81,73,0.30);  color: #f85149; border-radius: 1px; }
-  .seq-base.base-ins { background: rgba(63,185,80,0.28);  color: #3fb950; border-radius: 1px; }
-  .seq-base.base-sub { background: rgba(210,153,34,0.30); color: #d29922; border-radius: 1px; }
+  .seq-base.nuc-A { color: #3fb950; }
+  .seq-base.nuc-T { color: #d2a8ff; }
+  .seq-base.nuc-C { color: #ffa657; }
+  .seq-base.nuc-G { color: #e3b341; }
+  /* Highlight rules follow nucleotide rules so they win on specificity ties */
+  .seq-base.base-del { background: rgba(248,81,73,0.55);  color: #ff8080; border-radius: 1px; }
+  .seq-base.base-ins { background: rgba(63,185,80,0.50);  color: #7ee884; border-radius: 1px; }
+  .seq-base.base-sub { background: rgba(210,153,34,0.55); color: #ffdf5d; border-radius: 1px; }
   .allele-top-n-ctrl {
     display: flex; align-items: center; gap: 8px;
     font-family: var(--mono); font-size: 12px; color: var(--muted);
@@ -2639,8 +2646,8 @@ function renderSampleAlleles(r, topN) {
 
   // Reference row
   rows += `<tr class="allele-ref-row">
-    <td class="seq-label">Reference</td>
-    <td><span style="font-family:var(--mono);color:var(--muted)">${canonRef}</span></td>
+    <td class="seq-label" style="font-weight:600">Reference</td>
+    <td>${canonRef.split('').map(b => `<span class="seq-base nuc-${b}">${b}</span>`).join('')}</td>
     <td class="seq-freq"></td>
     <td class="seq-reads"></td>
   </tr>`;
@@ -2699,7 +2706,7 @@ function renderSequenceAlignment(alignedSeq, refSeq) {
     } else if (a !== r) {
       html += `<span class="seq-base base-sub">${a}</span>`;
     } else {
-      html += `<span class="seq-base" style="color:var(--muted)">${a}</span>`;
+      html += `<span class="seq-base nuc-${a}">${a}</span>`;
     }
   }
   return html;
