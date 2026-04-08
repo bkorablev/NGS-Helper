@@ -639,6 +639,28 @@
     display: flex; align-items: center; gap: 8px;
     font-family: var(--mono); font-size: 12px; color: var(--muted);
   }
+
+  /* ─── 22. Nucleotide composition heatmap ─── */
+  .nucl-chip {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nucl-chip.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+  .nucl-chip:hover:not(.active) { background: var(--surface); color: var(--text); }
+  .nucl-legend { display: flex; gap: 14px; font-size: 11px; font-family: var(--mono); color: var(--muted); flex-wrap: wrap; }
+  .nucl-legend-item { display: flex; align-items: center; gap: 5px; }
+  .nucl-legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -876,6 +898,18 @@
         </div>
       </div>
 
+      <!-- Tile 5: Nucleotide Composition -->
+      <div class="dash-tile" onclick="showResultsView('nucleotide')">
+        <div class="dash-tile-header">
+          <div class="dash-tile-icon"></div>
+          <div class="dash-tile-title">Nucleotide Composition</div>
+          <div class="dash-tile-desc">Per-position base frequency heatmap</div>
+        </div>
+        <div class="dash-tile-preview" id="tile-preview-nucl">
+          <div class="dash-tile-empty-msg">Load a results folder to preview</div>
+        </div>
+      </div>
+
     </div><!-- /.dash-grid -->
   </div><!-- /#results-dashboard -->
 
@@ -983,6 +1017,34 @@
     </div>
   </div>
 
+  <!-- ════ Drill-down: Nucleotide Composition ════ -->
+  <div id="results-nucleotide-view" style="display:none">
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
+    </div>
+    <div class="card" id="nucl-freq-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin-bottom:0">Nucleotide composition</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <button class="btn btn-secondary" id="nucl-yaxis-btn" onclick="toggleNuclYAxis()" style="padding:5px 12px;font-size:12px;font-family:var(--mono)">% of aligned reads</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="nucl-del-toggle" checked onchange="renderNuclView()">
+            Deletion bars
+          </label>
+        </div>
+      </div>
+      <div class="nucl-legend" style="margin-bottom:12px">
+        <span class="nucl-legend-item"><span class="nucl-legend-swatch" style="background:#3fb950"></span>A</span>
+        <span class="nucl-legend-item"><span class="nucl-legend-swatch" style="background:#d2a8ff"></span>T</span>
+        <span class="nucl-legend-item"><span class="nucl-legend-swatch" style="background:#ffa657"></span>C</span>
+        <span class="nucl-legend-item"><span class="nucl-legend-swatch" style="background:#e3b341"></span>G</span>
+        <span class="nucl-legend-item"><span class="nucl-legend-swatch" style="background:#484f58"></span>Deletion</span>
+      </div>
+      <div id="nucl-sample-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+      <div id="nucl-chart-area"></div>
+    </div>
+  </div>
+
   <div id="results-empty" style="display:none" class="card">
     <div style="color:var(--muted);font-size:13px">No CRISPResso_on_* subfolders found in the selected folder. Make sure you selected the top-level CRISPRessoBatch output directory.</div>
   </div>
@@ -1033,6 +1095,9 @@
  *                                   clearBreakdownComparison,
  *                                   renderBreakdownComparisonPanel,
  *                                   exportBreakdownComparison
+ *  Section 16: Nucleotide composition — nuclYAxisMode, nuclSelectedSample,
+ *                                   toggleNuclYAxis, renderNuclView,
+ *                                   drawNuclSvg, renderTilePreviewNucl
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1467,14 +1532,18 @@ let resultsLoadedWithKO = false;
 const parseErrors      = [];
 let indelYAxisMode            = 'count'; // 'count' | 'pct'
 let indelExpandedIdx          = null;
+let nuclYAxisMode             = 'reads'; // 'reads' | 'pos'
+let nuclSelectedSample        = null;   // index into withNuclData array; null = auto (highest NHEJ%)
 let resultsView               = 'dashboard'; // 'dashboard' | 'summary' | 'breakdown' | 'indel'
 let breakdownSelectedSamples  = new Set();
 
 function loadResults(files) {
   const fileArr = Array.from(files);
   parseErrors.length = 0;
-  indelYAxisMode   = 'count';
-  indelExpandedIdx = null;
+  indelYAxisMode      = 'count';
+  indelExpandedIdx    = null;
+  nuclYAxisMode       = 'reads';
+  nuclSelectedSample  = null;
   resultsView      = 'dashboard';
   selectedIndices.clear();
   breakdownSelectedSamples.clear();
@@ -1504,17 +1573,21 @@ function loadResults(files) {
     const isDelHist      = fname === 'Deletion_histogram.txt';
     const isRefIndelHist = fname === 'Reference.Indel_histogram.txt';
     const isIndelHist    = fname === 'Indel_histogram.txt';
+    const isRefNuclFreq  = fname === 'Reference.Nucleotide_frequency_table.txt';
+    const isNuclFreq     = fname === 'Nucleotide_frequency_table.txt';
     const isRefAlleles    = fname.startsWith('Reference.Alleles_frequency_table');
     const isSgRNAAlleles  = fname.startsWith('Alleles_frequency_table_around_sgRNA_') && fname.endsWith('.txt');
     const isAlleles       = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
-    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefAlleles && !isSgRNAAlleles && !isAlleles) return;
-    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, sgRNAAllelesFile: null, zipAllelesFile: null, indelHistFile: null };
+    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefNuclFreq && !isNuclFreq && !isRefAlleles && !isSgRNAAlleles && !isAlleles) return;
+    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, sgRNAAllelesFile: null, zipAllelesFile: null, indelHistFile: null, nuclFreqFile: null };
     if (isQuant)                                                       groups[subKey].quantFile       = f;
     else if (isMap)                                                    groups[subKey].mapFile         = f;
     else if (isRefHist)                                                groups[subKey].delHistFile     = f;
     else if (isDelHist    && !groups[subKey].delHistFile)              groups[subKey].delHistFile     = f;
     else if (isRefIndelHist)                                           groups[subKey].indelHistFile   = f;
     else if (isIndelHist  && !groups[subKey].indelHistFile)            groups[subKey].indelHistFile   = f;
+    else if (isRefNuclFreq)                                            groups[subKey].nuclFreqFile    = f;
+    else if (isNuclFreq   && !groups[subKey].nuclFreqFile)             groups[subKey].nuclFreqFile    = f;
     else if (isRefAlleles)                                             groups[subKey].allelesFile     = f;  // HDR: Reference.* wins outright
     else if (isSgRNAAlleles && !groups[subKey].sgRNAAllelesFile)       groups[subKey].sgRNAAllelesFile = f; // preferred for standard runs
     else if (isAlleles    && !groups[subKey].zipAllelesFile)           groups[subKey].zipAllelesFile  = f;  // last resort fallback
@@ -1567,7 +1640,8 @@ async function parseSample(subfolder, files) {
     hasDelHist: false, delFsReads: 0, delInFrameReads: 0,
     delTotalReads: 0, delFsPct: 0, largeDels: [],
     hasIndelData: false, indelData: [],
-    hasAllelesData: false, topAlleles: [], rawTopAlleles: []
+    hasAllelesData: false, topAlleles: [], rawTopAlleles: [],
+    hasNuclData: false, nuclData: []
   };
 
   const safeRead = (file, label) =>
@@ -1575,11 +1649,12 @@ async function parseSample(subfolder, files) {
       parseErrors.push(`${name}: failed to read ${label} — ${e.message}`); return null;
     }) : Promise.resolve(null);
 
-  const [mapText, quantText, delHistText, indelHistText] = await Promise.all([
+  const [mapText, quantText, delHistText, indelHistText, nuclFreqText] = await Promise.all([
     safeRead(files.mapFile,       'CRISPResso_mapping_statistics.txt'),
     safeRead(files.quantFile,     'CRISPResso_quantification_of_editing_frequency.txt'),
     safeRead(files.delHistFile,   'deletion histogram'),
     safeRead(files.indelHistFile, 'indel histogram'),
+    safeRead(files.nuclFreqFile,  'nucleotide frequency table'),
   ]);
 
   if (mapText) {
@@ -1653,6 +1728,30 @@ async function parseSample(subfolder, files) {
     });
     result.indelData    = data;
     result.hasIndelData = data.length > 0;
+  }
+
+  if (nuclFreqText) {
+    const rows = parseTSV(nuclFreqText);
+    const data = [];
+    // Helper: try multiple column name variants, return int or 0
+    const getCol = (row, ...keys) => {
+      for (const k of keys) if (row[k] !== undefined) return parseInt(row[k]) || 0;
+      return 0;
+    };
+    rows.forEach(row => {
+      const pos = parseInt(row['Position']) || 0;
+      if (pos <= 0) return;
+      const A   = getCol(row, 'A',          'Reference_A');
+      const T   = getCol(row, 'T',          'Reference_T');
+      const C   = getCol(row, 'C',          'Reference_C');
+      const G   = getCol(row, 'G',          'Reference_G');
+      const N   = getCol(row, 'N',          'Reference_N');
+      const ins = getCol(row, 'Insertions', 'Reference_Insertions', 'Insertions_Left');
+      const del = getCol(row, 'Deletions',  'Reference_Deletions',  'Deletions_Right', 'Deletions_Left');
+      data.push({ pos, A, T, C, G, N, ins, del });
+    });
+    result.nuclData    = data;
+    result.hasNuclData = data.length > 0;
   }
 
   result.allelesFileRef = files.allelesFile || null;
@@ -1977,8 +2076,9 @@ const DASH_VIEWS = {
   dashboard: 'results-dashboard',
   summary:   'results-summary-view',
   breakdown: 'results-breakdown-view',
-  indel:     'results-indel-view',
-  alleles:   'results-alleles-view',
+  indel:      'results-indel-view',
+  alleles:    'results-alleles-view',
+  nucleotide: 'results-nucleotide-view',
 };
 
 // Show one view and hide all others. Refreshes tile previews when returning to dashboard.
@@ -1988,8 +2088,9 @@ function showResultsView(view) {
     const el = document.getElementById(id);
     if (el) el.style.display = key === view ? '' : 'none';
   });
-  if (view === 'dashboard') renderDashboard();
-  if (view === 'alleles')   renderAllelesView();
+  if (view === 'dashboard')   renderDashboard();
+  if (view === 'alleles')     renderAllelesView();
+  if (view === 'nucleotide')  renderNuclView();
   renderBreakdownComparisonPanel(); // show/hide based on view + selection state
 }
 
@@ -2001,6 +2102,7 @@ function renderDashboard() {
   renderTilePreviewBreakdown();
   renderTilePreviewIndel();
   renderTilePreviewAlleles();
+  renderTilePreviewNucl();
 }
 
 // ── Tile 1: Summary — stacked bar, max MAX_BARS rows with fade if more ────────
@@ -2473,7 +2575,7 @@ function showSpinner() {
   el.classList.remove('fade-out');
   el.style.display = 'flex';
   ['results-dashboard','results-summary-view','results-breakdown-view',
-   'results-indel-view','results-alleles-view'].forEach(id => {
+   'results-indel-view','results-alleles-view','results-nucleotide-view'].forEach(id => {
     const e = document.getElementById(id); if (e) e.style.display = 'none';
   });
   document.getElementById('results-empty').style.display  = 'none';
@@ -2752,6 +2854,166 @@ function renderTilePreviewAlleles() {
     svg += `<text x="${LABEL_W - 5}" y="${by + barH/2 + 3.5}" text-anchor="end" fill="#7d8590" font-size="9" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
     svg += `<rect x="${LABEL_W}" y="${by}" width="${bw.toFixed(1)}" height="${barH}" fill="${fill}" rx="1"/>`;
     svg += `<text x="${LABEL_W + bw + 4}" y="${by + barH/2 + 3.5}" text-anchor="start" fill="#7d8590" font-size="9" font-family="IBM Plex Mono,monospace">${a.freq.toFixed(1)}%</text>`;
+  });
+
+  svg += '</svg>';
+  el.innerHTML = svg + `<div class="dash-preview-fade"></div>`;
+}
+
+// ─── Section 16: Nucleotide composition ───────────────────────────────────────
+
+function toggleNuclYAxis() {
+  nuclYAxisMode = nuclYAxisMode === 'reads' ? 'pos' : 'reads';
+  document.getElementById('nucl-yaxis-btn').textContent =
+    nuclYAxisMode === 'reads' ? '% of aligned reads' : '% of bases at position';
+  renderNuclView();
+}
+
+function renderNuclView() {
+  const withData = resultsData.filter(r => !r.failed && r.hasNuclData);
+  const area     = document.getElementById('nucl-chart-area');
+  const chipsEl  = document.getElementById('nucl-sample-chips');
+  if (!area) return;
+
+  if (!withData.length) {
+    if (chipsEl) chipsEl.innerHTML = '';
+    area.innerHTML = `<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:24px 0">No nucleotide frequency table found in sample subfolders.</div>`;
+    return;
+  }
+
+  // Auto-select highest NHEJ% on first call or if index is out of range
+  if (nuclSelectedSample === null || nuclSelectedSample >= withData.length) {
+    nuclSelectedSample = withData.reduce((bi, r, i) => r.nhejPct > withData[bi].nhejPct ? i : bi, 0);
+  }
+
+  // Chip buttons
+  if (chipsEl) {
+    chipsEl.innerHTML = withData.map((r, i) =>
+      `<button class="nucl-chip${i === nuclSelectedSample ? ' active' : ''}" onclick="nuclSelectedSample=${i};renderNuclView()">${escapeHtml(r.name)}</button>`
+    ).join('');
+  }
+
+  const r       = withData[nuclSelectedSample];
+  const showDel = document.getElementById('nucl-del-toggle')?.checked ?? true;
+  area.innerHTML = drawNuclSvg(r, showDel);
+}
+
+function drawNuclSvg(r, showDel) {
+  const NUC_C = { A: '#3fb950', T: '#d2a8ff', C: '#ffa657', G: '#e3b341', N: '#484f58' };
+  const usePosMode = nuclYAxisMode === 'pos';
+
+  const data = r.nuclData;
+  if (!data.length) return '';
+
+  const W = 900, H = 200;
+  const ML = 14, MR = 10, MT = 8, MB = 18;
+  const DEL_H = showDel ? 28 : 0;
+  const GAP   = showDel ?  6 : 0;
+  const cW    = W - ML - MR;
+  const cH    = H - MT - MB - DEL_H - GAP;
+  const n     = data.length;
+  const colW  = cW / n;
+  const aln   = r.alignedAllAmplicons || 1;
+
+  const delTop  = MT;
+  const baseTop = MT + DEL_H + GAP;
+
+  let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible" font-family="'IBM Plex Mono',monospace">`;
+
+  // Base area background
+  svg += `<rect x="${ML}" y="${baseTop}" width="${cW}" height="${cH}" fill="#161b22"/>`;
+
+  data.forEach((d, i) => {
+    const x = ML + i * colW;
+    const w = Math.max(colW - 0.2, 0.2);
+
+    // Deletion bar (drawn downward from top of del area)
+    if (showDel && d.del > 0) {
+      const dh = Math.min((d.del / aln) * DEL_H, DEL_H);
+      svg += `<rect x="${x.toFixed(1)}" y="${(delTop + DEL_H - dh).toFixed(1)}" width="${w.toFixed(1)}" height="${dh.toFixed(1)}" fill="#484f58"/>`;
+    }
+
+    // Stacked base bars — order bottom→top: N, G, C, T, A
+    const total = usePosMode ? Math.max(d.A + d.T + d.C + d.G + d.N, 1) : aln;
+    let cumH = 0;
+    for (const b of ['N', 'G', 'C', 'T', 'A']) {
+      const count = d[b];
+      if (!count) continue;
+      const h = (count / total) * cH;
+      if (h < 0.05) { cumH += h; continue; }
+      const by = baseTop + cH - cumH - h;
+      svg += `<rect x="${x.toFixed(1)}" y="${by.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${NUC_C[b]}"/>`;
+      cumH += h;
+    }
+  });
+
+  // Baselines
+  svg += `<line x1="${ML}" y1="${baseTop + cH}" x2="${ML + cW}" y2="${baseTop + cH}" stroke="#30363d" stroke-width="1"/>`;
+  if (showDel) {
+    svg += `<line x1="${ML}" y1="${delTop + DEL_H}" x2="${ML + cW}" y2="${delTop + DEL_H}" stroke="#30363d" stroke-width="1"/>`;
+    // Del area label
+    svg += `<text x="${ML + cW + 4}" y="${delTop + DEL_H - 2}" fill="#7d8590" font-size="7">del</text>`;
+  }
+
+  // X-axis tick labels (position numbers)
+  const step = n <= 50 ? 5 : n <= 150 ? 10 : n <= 300 ? 25 : n <= 600 ? 50 : 100;
+  const seenPos = new Set();
+  data.forEach((d, i) => {
+    if (d.pos % step !== 0) return;
+    if (seenPos.has(d.pos)) return; seenPos.add(d.pos);
+    const tx = (ML + i * colW + colW / 2).toFixed(1);
+    svg += `<text x="${tx}" y="${H - 3}" text-anchor="middle" fill="#7d8590" font-size="8">${d.pos}</text>`;
+  });
+
+  // Y-axis corner labels
+  svg += `<text x="${ML - 2}" y="${baseTop + 7}" text-anchor="end" fill="#7d8590" font-size="7">100%</text>`;
+  svg += `<text x="${ML - 2}" y="${baseTop + cH}" text-anchor="end" fill="#7d8590" font-size="7">0</text>`;
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ── Tile 5 preview: nucleotide heatmap of the most-edited sample ──────────────
+function renderTilePreviewNucl() {
+  const el = document.getElementById('tile-preview-nucl');
+  if (!el) return;
+
+  const withData = resultsData.filter(r => !r.failed && r.hasNuclData);
+  if (!withData.length) {
+    el.innerHTML = `<div class="dash-tile-empty-msg">Load a results folder to preview</div>`;
+    return;
+  }
+
+  const NUC_C = { A: '#3fb950', T: '#d2a8ff', C: '#ffa657', G: '#e3b341', N: '#484f58' };
+  const rep   = withData.reduce((best, r) => r.nhejPct > best.nhejPct ? r : best, withData[0]);
+  const data  = rep.nuclData;
+  const aln   = rep.alignedAllAmplicons || 1;
+
+  // Downsample to max 80 columns for the tile preview
+  const maxCols = 80;
+  const step    = Math.max(1, Math.floor(data.length / maxCols));
+  const sampled = data.filter((_, i) => i % step === 0);
+
+  const W = 240, H = 60;
+  const ML = 0, cW = W, cH = H;
+  const colW = cW / sampled.length;
+
+  let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block" pointer-events="none">`;
+  svg += `<rect x="0" y="0" width="${W}" height="${H}" fill="#161b22"/>`;
+
+  sampled.forEach((d, i) => {
+    const x = ML + i * colW;
+    const w = Math.max(colW - 0.2, 0.2);
+    let cumH = 0;
+    for (const b of ['N', 'G', 'C', 'T', 'A']) {
+      const count = d[b];
+      if (!count) continue;
+      const h = (count / aln) * cH;
+      if (h < 0.05) { cumH += h; continue; }
+      const by = cH - cumH - h;
+      svg += `<rect x="${x.toFixed(1)}" y="${by.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${NUC_C[b]}"/>`;
+      cumH += h;
+    }
   });
 
   svg += '</svg>';
