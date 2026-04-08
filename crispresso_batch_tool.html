@@ -1731,27 +1731,36 @@ async function parseSample(subfolder, files) {
   }
 
   if (nuclFreqText) {
-    const rows = parseTSV(nuclFreqText);
-    const data = [];
-    // Helper: try multiple column name variants, return int or 0
-    const getCol = (row, ...keys) => {
-      for (const k of keys) if (row[k] !== undefined) return parseInt(row[k]) || 0;
-      return 0;
-    };
-    rows.forEach(row => {
-      const pos = parseInt(row['Position']) || 0;
-      if (pos <= 0) return;
-      const A   = getCol(row, 'A',          'Reference_A');
-      const T   = getCol(row, 'T',          'Reference_T');
-      const C   = getCol(row, 'C',          'Reference_C');
-      const G   = getCol(row, 'G',          'Reference_G');
-      const N   = getCol(row, 'N',          'Reference_N');
-      const ins = getCol(row, 'Insertions', 'Reference_Insertions', 'Insertions_Left');
-      const del = getCol(row, 'Deletions',  'Reference_Deletions',  'Deletions_Right', 'Deletions_Left');
-      data.push({ pos, A, T, C, G, N, ins, del });
-    });
-    result.nuclData    = data;
-    result.hasNuclData = data.length > 0;
+    // The nucleotide frequency table is transposed:
+    //   Row 1 (header): [empty] [refnuc_pos1] [refnuc_pos2] ...  ← reference sequence
+    //   Row "A":        A  [count_pos1]  [count_pos2]  ...
+    //   Row "C":        C  [count_pos1]  [count_pos2]  ...
+    //   Row "G", "T", "N", "-" (deletions) follow the same pattern.
+    // Columns = positions (1-indexed). No explicit Position column.
+    const lines = nuclFreqText.split('\n').map(l => l.trimEnd()).filter(l => l.length);
+    if (lines.length >= 2) {
+      const headerFields = lines[0].split('\t');
+      const numPos = headerFields.length - 1; // first field is empty label
+      const data   = Array.from({ length: numPos }, (_, i) => ({ pos: i + 1, A: 0, T: 0, C: 0, G: 0, N: 0, ins: 0, del: 0 }));
+
+      lines.slice(1).forEach(line => {
+        const fields = line.split('\t');
+        const label  = fields[0].trim();
+        // Map row label to data key; '-' is the deletion row
+        const key = label === 'A' ? 'A' : label === 'T' ? 'T' : label === 'C' ? 'C'
+                  : label === 'G' ? 'G' : label === 'N' ? 'N'
+                  : (label === '-' || label.toLowerCase().startsWith('del')) ? 'del'
+                  : label.toLowerCase().startsWith('ins') ? 'ins'
+                  : null;
+        if (!key) return;
+        for (let i = 0; i < numPos && i + 1 < fields.length; i++) {
+          data[i][key] += parseFloat(fields[i + 1]) || 0;
+        }
+      });
+
+      result.nuclData    = data;
+      result.hasNuclData = data.length > 0;
+    }
   }
 
   result.allelesFileRef = files.allelesFile || null;
