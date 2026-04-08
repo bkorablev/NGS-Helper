@@ -1151,7 +1151,7 @@ function handleURLParams() {
   const folderName = resultsPath.split('/').filter(Boolean).pop() || resultsPath;
   document.getElementById('results-folder-label').textContent = resultsPath;
 
-  msg.innerHTML = `Results path: <strong style="color:var(--text)">${resultsPath}</strong>
+  msg.innerHTML = `Results path: <strong style="color:var(--text)">${escapeHtml(resultsPath)}</strong>
     &nbsp;—&nbsp; click <strong>Browse folder…</strong> above and navigate to this folder.`;
 
   // Also pre-fill the KO ploidy / other params if provided
@@ -1229,27 +1229,28 @@ function renderFileList(pairs, unmatched) {
     <div class="stat"><div class="stat-val" style="color:${orphaned>0?'var(--error)':'var(--muted)'}">${orphaned}</div><div class="stat-label">Unpaired / unknown</div></div>
   `;
 
-  list.innerHTML = '';
+  let listHtml = '';
   Object.entries(pairs).forEach(([key, val]) => {
     const paired = val.r1 && val.r2;
-    list.innerHTML += `
+    listHtml += `
       <div class="file-item">
         <span class="file-badge ${paired ? 'badge-r1' : 'badge-unpaired'}">${paired ? 'PAIR' : 'R1 ONLY'}</span>
-        <span style="color:var(--text);flex:1">${key}</span>
-        <span style="color:var(--muted);font-size:11px">${val.r1 || '—'}</span>
+        <span style="color:var(--text);flex:1">${escapeHtml(key)}</span>
+        <span style="color:var(--muted);font-size:11px">${escapeHtml(val.r1 || '—')}</span>
         <span style="color:var(--muted)">↔</span>
-        <span style="color:var(--muted);font-size:11px">${val.r2 || '<span style="color:var(--error)">missing R2</span>'}</span>
+        <span style="color:var(--muted);font-size:11px">${val.r2 ? escapeHtml(val.r2) : '<span style="color:var(--error)">missing R2</span>'}</span>
       </div>`;
   });
 
   unmatched.forEach(f => {
-    list.innerHTML += `
+    listHtml += `
       <div class="file-item">
         <span class="file-badge badge-unpaired">UNKNOWN</span>
-        <span style="color:var(--muted);flex:1">${f.name}</span>
+        <span style="color:var(--muted);flex:1">${escapeHtml(f.name)}</span>
         <span style="color:var(--muted);font-size:11px">Could not detect R1/R2 — will be skipped</span>
       </div>`;
   });
+  list.innerHTML = listHtml;
 }
 
 function clearFiles() {
@@ -2416,7 +2417,7 @@ function classifyAllele(a, largeDel) {
   const { nDel, nIns, readStatus } = a;
   if (readStatus === 'UNMODIFIED' && nDel === 0 && nIns === 0) return 'Wildtype';
   if (nDel === 0 && nIns === 0) return 'Substitution only';
-  if ((nDel % 3 !== 0) || (nIns % 3 !== 0)) return 'Frameshift';
+  if ((nIns - nDel) % 3 !== 0) return 'Frameshift';
   if (nDel >= largeDel) return 'Large in-frame deletion';
   return 'In-frame';
 }
