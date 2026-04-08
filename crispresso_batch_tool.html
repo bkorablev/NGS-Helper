@@ -260,6 +260,9 @@
 
   td input[type=text] { padding: 5px 8px; font-size: 12px; border-color: transparent; background: transparent; }
   td input[type=text]:focus { background: var(--bg); border-color: var(--accent); }
+  .wc-cell select { padding: 4px 6px; font-size: 12px; font-family: var(--mono); background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+  .wc-cell input[type=number] { padding: 4px 6px; font-size: 12px; font-family: var(--mono); width: 54px; background: transparent; border-color: var(--border); margin-left: 4px; }
+  .wc-cell input[type=number]:focus { background: var(--bg); border-color: var(--accent); }
 
   .sample-name-cell { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 160px; }
   .label-cell { min-width: 180px; }
@@ -1200,6 +1203,7 @@ function handleFiles(files) {
     amplicon: '',
     guide: '',
     hdr_seq: '',
+    wc: -3,
     coding: false
   }));
 
@@ -1321,6 +1325,43 @@ function fillDown(row, col) {
   }
 }
 
+function updateWc(sel) {
+  const i   = parseInt(sel.dataset.row);
+  const inp = document.querySelector(`input[data-row="${i}"][data-col="wc-custom"]`);
+  if (sel.value === 'custom') {
+    inp.style.display = '';
+    inp.focus();
+  } else {
+    samples[i].wc    = parseInt(sel.value);
+    inp.style.display = 'none';
+  }
+}
+
+function updateWcCustom(inp) {
+  const i   = parseInt(inp.dataset.row);
+  const val = parseInt(inp.value);
+  if (!isNaN(val)) samples[i].wc = val;
+}
+
+function fillDownWc(row) {
+  const value    = samples[row].wc;
+  const isPreset = value === -3 || value === 1;
+  for (let j = row + 1; j < samples.length; j++) {
+    samples[j].wc = value;
+    const sel = document.querySelector(`select[data-row="${j}"][data-col="wc"]`);
+    const inp = document.querySelector(`input[data-row="${j}"][data-col="wc-custom"]`);
+    if (sel) {
+      sel.value = isPreset ? String(value) : 'custom';
+      sel.classList.add('fill-flash');
+      setTimeout(() => sel.classList.remove('fill-flash'), 600);
+    }
+    if (inp) {
+      inp.value         = String(value);
+      inp.style.display = isPreset ? 'none' : '';
+    }
+  }
+}
+
 function renderSampleTable() {
   const wrap = document.getElementById('sample-table-wrap');
   if (!samples.length) {
@@ -1335,6 +1376,7 @@ function renderSampleTable() {
       <th>Sample name</th>
       <th>R1 file</th>
       <th>R2 file</th>
+      <th><span title="--quantification_window_center: cut position relative to the guide (default −3 for Cas9, +1 for Cpf1/Cas12a)">wc</span></th>
       <th>Amplicon sequence <span style="color:var(--error)">*</span></th>
       <th>Guide RNA (spacer) <span style="color:var(--error)">*</span></th>
       <th>HDR template <span style="color:var(--muted)">(opt)</span></th>
@@ -1356,6 +1398,17 @@ function renderSampleTable() {
         onkeydown="handleEnterKey(event,this)"></td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r1}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.r2}</td>
+      <td class="wc-cell"><div class="fill-wrap">
+        <select data-row="${i}" data-col="wc" onchange="updateWc(this)">
+          <option value="-3"${s.wc===-3?' selected':''}>−3 (Cas9)</option>
+          <option value="1"${s.wc===1?' selected':''}>+1 (Cpf1)</option>
+          <option value="custom"${(s.wc!==-3&&s.wc!==1)?' selected':''}>custom…</option>
+        </select>
+        <input type="number" data-row="${i}" data-col="wc-custom" value="${s.wc}"
+          style="${(s.wc!==-3&&s.wc!==1)?'':'display:none'}"
+          oninput="updateWcCustom(this)">
+        ${notLast?`<button class="fill-btn" data-row="${i}" data-col="wc" onclick="fillDownWc(+this.dataset.row)" title="Fill down">↓</button>`:''}
+      </div></td>
       <td class="seq-cell"><div class="fill-wrap"><input type="text" placeholder="ATCG…" value="${s.amplicon}"
         data-row="${i}" data-col="amplicon"
         oninput="updateSample(this,'amplicon')"
@@ -1465,14 +1518,22 @@ function revComp(seq) {
 
 // ─── Section 7: Export ────────────────────────────────────────────────────────
 function buildExport() {
+  const DEFAULT_WC = -3;
+  const wcValues   = samples.map(s => s.wc ?? DEFAULT_WC);
+  const allDefault = wcValues.every(v => v === DEFAULT_WC);
+  const allSameWc  = wcValues.every(v => v === wcValues[0]);
+  const mixedWc    = !allSameWc;
+
   const cols = ['name', 'fastq_r1', 'fastq_r2', 'amplicon_seq', 'guide_seq'];
   const hasHDR = samples.some(s => s.hdr_seq);
-  if (hasHDR) cols.push('expected_hdr_amplicon_seq');
+  if (hasHDR)   cols.push('expected_hdr_amplicon_seq');
+  if (mixedWc)  cols.push('quantification_window_center');
 
   const rows = [cols.join('\t')];
-  samples.forEach(s => {
+  samples.forEach((s, idx) => {
     const row = [s.name, s.r1, s.r2, s.amplicon, s.guide];
-    if (hasHDR) row.push(s.hdr_seq || '');
+    if (hasHDR)  row.push(s.hdr_seq || '');
+    if (mixedWc) row.push(wcValues[idx]);
     rows.push(row.join('\t'));
   });
 
@@ -1485,9 +1546,10 @@ function buildExport() {
   const extra        = document.getElementById('param-extra').value.trim();
 
   let cmd = `CRISPRessoBatch --batch_settings ${batchName}`;
-  if (qw && qw !== '1')           cmd += ` --quantification_window_size ${qw}`;
-  if (minfreq && minfreq !== '0.2') cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
-  if (extra)                       cmd += ` ${extra}`;
+  if (qw && qw !== '1')              cmd += ` --quantification_window_size ${qw}`;
+  if (!allDefault && allSameWc)      cmd += ` --quantification_window_center ${wcValues[0]}`;
+  if (minfreq && minfreq !== '0.2')  cmd += ` --min_frequency_alleles_around_cut_to_plot ${minfreq}`;
+  if (extra)                         cmd += ` ${extra}`;
 
   document.getElementById('run-cmd').textContent = cmd;
 }
@@ -1503,16 +1565,22 @@ function downloadBatch() {
 
 function downloadBatchXlsx() {
   const batchNameVal = document.getElementById('param-name').value.trim() || 'batch';
+  const DEFAULT_WC   = -3;
+  const wcValues     = samples.map(s => s.wc ?? DEFAULT_WC);
+  const allSameWc    = wcValues.every(v => v === wcValues[0]);
+  const mixedWc      = !allSameWc;
   const hasHDR = samples.some(s => s.hdr_seq);
   const cols   = ['name','fastq_r1','fastq_r2','amplicon_seq','guide_seq'];
-  if (hasHDR) cols.push('expected_hdr_amplicon_seq');
-  const rows = [cols, ...samples.map(s => cols.map(c => {
+  if (hasHDR)  cols.push('expected_hdr_amplicon_seq');
+  if (mixedWc) cols.push('quantification_window_center');
+  const rows = [cols, ...samples.map((s, idx) => cols.map(c => {
     if (c==='name') return s.label||'';
     if (c==='fastq_r1') return s.r1||'';
     if (c==='fastq_r2') return s.r2||'';
     if (c==='amplicon_seq') return s.amplicon||'';
     if (c==='guide_seq') return s.guide||'';
     if (c==='expected_hdr_amplicon_seq') return s.hdr_seq||'';
+    if (c==='quantification_window_center') return wcValues[idx];
   }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'batch');
