@@ -1534,6 +1534,7 @@ let indelYAxisMode            = 'count'; // 'count' | 'pct'
 let indelExpandedIdx          = null;
 let nuclYAxisMode             = 'reads'; // 'reads' | 'pos'
 let nuclSelectedSample        = null;   // index into withNuclData array; null = auto (highest NHEJ%)
+let nuclZoomCenter            = null;   // column index (into nuclData) at center of zoom panel; null = auto
 let resultsView               = 'dashboard'; // 'dashboard' | 'summary' | 'breakdown' | 'indel'
 let breakdownSelectedSamples  = new Set();
 
@@ -1544,6 +1545,7 @@ function loadResults(files) {
   indelExpandedIdx    = null;
   nuclYAxisMode       = 'reads';
   nuclSelectedSample  = null;
+  nuclZoomCenter      = null;
   resultsView      = 'dashboard';
   selectedIndices.clear();
   breakdownSelectedSamples.clear();
@@ -2944,26 +2946,22 @@ function renderNuclView() {
   // Chip buttons
   if (chipsEl) {
     chipsEl.innerHTML = withData.map((r, i) =>
-      `<button class="nucl-chip${i === nuclSelectedSample ? ' active' : ''}" onclick="nuclSelectedSample=${i};renderNuclView()">${escapeHtml(r.name)}</button>`
+      `<button class="nucl-chip${i === nuclSelectedSample ? ' active' : ''}" onclick="nuclSelectedSample=${i};nuclZoomCenter=null;renderNuclView()">${escapeHtml(r.name)}</button>`
     ).join('');
   }
 
   const r       = withData[nuclSelectedSample];
   const showDel = document.getElementById('nucl-del-toggle')?.checked ?? true;
-  let html = drawNuclSvg(r, showDel, 'full');
-  if (r.hasNuclSgRNAData) {
-    const sgLabel = r.sgRNASeq ? ` — ${escapeHtml(r.sgRNASeq)}` : '';
-    html += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:20px 0 6px;padding-top:12px;border-top:1px solid var(--border)">Around sgRNA${sgLabel}</div>`;
-    html += drawNuclSvg(r, showDel, 'sgrna');
-  }
-  area.innerHTML = html;
+  area.innerHTML = drawNuclSvg(r, showDel, 'full') +
+    `<div id="nucl-zoom-panel" style="margin-top:4px"></div>`;
+  renderNuclZoomPanel();
 }
 
-function drawNuclSvg(r, showDel, mode = 'full') {
+function drawNuclSvg(r, showDel, mode = 'full', overrideData = null) {
   const NUC_C    = { A: '#3fb950', T: '#d2a8ff', C: '#ffa657', G: '#e3b341', N: '#484f58' };
   const usePosMode = nuclYAxisMode === 'pos';
 
-  const data = (mode === 'sgrna' && r.hasNuclSgRNAData) ? r.nuclSgRNAData : r.nuclData;
+  const data = overrideData || ((mode === 'sgrna' && r.hasNuclSgRNAData) ? r.nuclSgRNAData : r.nuclData);
   if (!data.length) return '';
 
   const aln = r.alignedAllAmplicons || 1;
@@ -2986,11 +2984,12 @@ function drawNuclSvg(r, showDel, mode = 'full') {
   const colW = cW / n;
 
   // Zone heights — sgRNA row only allocated when its position is known
-  const DEL_H       = showDel ? (mode === 'sgrna' ? 36 : 28) : 0;
+  const isLarge     = mode === 'sgrna' || mode === 'zoom';
+  const DEL_H       = showDel ? (isLarge ? 36 : 28) : 0;
   const GAP         = showDel ? 6 : 0;
-  const BASE_H      = mode === 'sgrna' ? 160 : 120;
-  const REF_H       = mode === 'sgrna' ? 22 : 12;
-  const SGRNA_ROW_H = sgRNARange ? (mode === 'sgrna' ? 24 : 16) : 0;
+  const BASE_H      = isLarge ? 160 : 120;
+  const REF_H       = isLarge ? 22 : 12;
+  const SGRNA_ROW_H = sgRNARange ? (isLarge ? 24 : 16) : 0;
 
   // Y zone tops
   const delTop  = MT;
@@ -3032,13 +3031,13 @@ function drawNuclSvg(r, showDel, mode = 'full') {
     // ─ % label on dominant bar ─
     // Always use % of aligned reads (matches native CRISPResso output).
     // Full mode: only label where dominant base has dropped (editing hotspots).
-    // sgRNA mode: label every column wide/tall enough to fit the text.
+    // sgRNA/zoom mode: label every column wide/tall enough to fit the text.
     const domPct    = (domCount / aln) * 100;
-    const showLabel = domH >= 10 && colW >= 7 && (mode === 'sgrna' ? domH >= 14 : domPct < 94);
+    const showLabel = domH >= 10 && colW >= 7 && (isLarge ? domH >= 14 : domPct < 94);
     if (showLabel) {
       const cx = x + colW / 2;
       const cy = baseBot - domCumHStart - domH / 2;
-      const fs = mode === 'sgrna' ? 8.5 : 7;
+      const fs = isLarge ? 8.5 : 7;
       svg += `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="#fff" fill-opacity="0.9" font-size="${fs}" transform="rotate(-90,${cx.toFixed(1)},${cy.toFixed(1)})">${domPct.toFixed(1)}%</text>`;
     }
 
@@ -3046,7 +3045,7 @@ function drawNuclSvg(r, showDel, mode = 'full') {
     const refBase  = (d.ref || '').charAt(0).toUpperCase();
     const refColor = NUC_C[refBase] || '#7d8590';
     if (refBase && 'ATCGN'.includes(refBase)) {
-      if (mode === 'sgrna') {
+      if (isLarge) {
         // Colored background box + letter
         const bh = REF_H - 1;
         svg += `<rect x="${x.toFixed(1)}" y="${refTop}" width="${w.toFixed(1)}" height="${bh}" fill="${refColor}" opacity="0.75"/>`;
@@ -3076,30 +3075,114 @@ function drawNuclSvg(r, showDel, mode = 'full') {
   if (sgRNARange) {
     const bx   = ML + sgRNARange.start * colW;
     const bw   = (sgRNARange.end - sgRNARange.start + 1) * colW;
-    const barH = mode === 'sgrna' ? 8 : 5;
+    const barH = isLarge ? 8 : 5;
     const barY = sgTop + 2;
-    const lblY = barY + barH + (mode === 'sgrna' ? 11 : 8);
-    const lblFs = mode === 'sgrna' ? 9 : 7;
+    const lblY = barY + barH + (isLarge ? 11 : 8);
+    const lblFs = isLarge ? 9 : 7;
     svg += `<rect x="${bx.toFixed(1)}" y="${barY}" width="${bw.toFixed(1)}" height="${barH}" fill="#7d8590" opacity="0.45" rx="2"/>`;
     svg += `<text x="${(bx + bw / 2).toFixed(1)}" y="${lblY}" text-anchor="middle" fill="#7d8590" font-size="${lblFs}">sgRNA</text>`;
   }
 
   // ─ X-axis position labels ─
-  const step = n <= 50 ? 5 : n <= 150 ? 10 : n <= 300 ? 25 : n <= 600 ? 50 : 100;
+  const step = mode === 'zoom' ? 1 : (n <= 50 ? 5 : n <= 150 ? 10 : n <= 300 ? 25 : n <= 600 ? 50 : 100);
   const seenPos = new Set();
   data.forEach((d, i) => {
-    if (d.pos % step !== 0) return;
+    if (mode !== 'zoom' && d.pos % step !== 0) return;
     if (seenPos.has(d.pos)) return; seenPos.add(d.pos);
     const tx = (ML + i * colW + colW / 2).toFixed(1);
-    svg += `<text x="${tx}" y="${xlabTop + 12}" text-anchor="middle" fill="#7d8590" font-size="8">${d.pos}</text>`;
+    const ty = xlabTop + 12;
+    if (mode === 'zoom' && colW < 14) {
+      // Rotate labels when columns are narrow to avoid overlap
+      svg += `<text x="${tx}" y="${ty}" text-anchor="end" fill="#7d8590" font-size="8" transform="rotate(-60,${tx},${ty})">${d.pos}</text>`;
+    } else {
+      svg += `<text x="${tx}" y="${ty}" text-anchor="middle" fill="#7d8590" font-size="8">${d.pos}</text>`;
+    }
   });
 
   // ─ Y-axis labels ─
   svg += `<text x="${ML - 2}" y="${baseTop + 7}" text-anchor="end" fill="#7d8590" font-size="7">100%</text>`;
   svg += `<text x="${ML - 2}" y="${baseBot}" text-anchor="end" fill="#7d8590" font-size="7">0</text>`;
 
+  // ─ Zoom window indicator + hover overlay (full amplicon only) ─
+  if (mode === 'full') {
+    // Compute initial indicator position from current zoom state
+    const initCenter = nuclZoomCenter !== null ? nuclZoomCenter : getDefaultNuclZoomCenter(r);
+    const iHalf  = 25;
+    const iStart = Math.max(0, initCenter - iHalf);
+    const iEnd   = Math.min(n - 1, iStart + 49);
+    const iAdj   = Math.max(0, iEnd - 49);
+    const iLen   = iEnd - iAdj + 1;
+    const ix     = (ML + iAdj * colW).toFixed(1);
+    const iw     = (iLen * colW).toFixed(1);
+    const indH   = xlabTop - MT;
+    // Indicator box: visible selection rectangle; pointer-events=none so hover still works
+    svg += `<rect id="nucl-zoom-indicator" x="${ix}" y="${MT}" width="${iw}" height="${indH}" fill="white" fill-opacity="0.12" stroke="white" stroke-opacity="0.65" stroke-width="1" rx="2" pointer-events="none" data-n="${n}" data-ml="${ML}" data-cw="${cW}"/>`;
+    // Invisible hit-target on top for mouse tracking
+    svg += `<rect x="${ML}" y="${MT}" width="${cW}" height="${H - MT}" fill="white" fill-opacity="0" style="cursor:crosshair" onmousemove="nuclHoverUpdate(event,${n})"/>`;
+  }
+
   svg += '</svg>';
   return svg;
+}
+
+// ── Nucleotide zoom panel ─────────────────────────────────────────────────────
+
+function getDefaultNuclZoomCenter(r) {
+  // Default to the midpoint of the sgRNA; fall back to the amplicon midpoint.
+  if (r.sgRNASeq && r.nuclData.length) {
+    const refStr = r.nuclData.map(d => d.ref || '').join('').toUpperCase();
+    const fwd    = r.sgRNASeq.toUpperCase();
+    let   idx    = refStr.indexOf(fwd);
+    if (idx < 0) idx = refStr.indexOf(revComp(fwd));
+    if (idx >= 0) return Math.round(idx + r.sgRNASeq.length / 2);
+  }
+  return Math.floor(r.nuclData.length / 2);
+}
+
+function renderNuclZoomPanel() {
+  const panel = document.getElementById('nucl-zoom-panel');
+  if (!panel) return;
+
+  const withData = resultsData.filter(r => !r.failed && r.hasNuclData);
+  if (!withData.length) return;
+
+  const r       = withData[nuclSelectedSample];
+  const showDel = document.getElementById('nucl-del-toggle')?.checked ?? true;
+  const n       = r.nuclData.length;
+
+  const center  = nuclZoomCenter !== null ? nuclZoomCenter : getDefaultNuclZoomCenter(r);
+  const HALF    = 25; // 50-nt window
+  const start   = Math.max(0, center - HALF);
+  const end     = Math.min(n - 1, start + 49);         // always try for 50 cols
+  const adjStart= Math.max(0, end - 49);               // clamp start if near right edge
+  const slice   = r.nuclData.slice(adjStart, end + 1);
+
+  const posStart = slice[0]?.pos ?? adjStart + 1;
+  const posEnd   = slice[slice.length - 1]?.pos ?? end + 1;
+  const hint     = nuclZoomCenter === null ? ' — hover to pan' : '';
+  const label    = `50 nt window &nbsp;·&nbsp; positions ${posStart}–${posEnd}${hint}`;
+
+  panel.innerHTML =
+    `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:20px 0 6px;padding-top:12px;border-top:1px solid var(--border)">${label}</div>` +
+    drawNuclSvg(r, showDel, 'zoom', slice);
+
+  // Slide the indicator rectangle on the full-amplicon SVG without re-rendering it
+  const indicator = document.getElementById('nucl-zoom-indicator');
+  if (indicator) {
+    const iN    = parseInt(indicator.getAttribute('data-n'));
+    const iML   = parseFloat(indicator.getAttribute('data-ml'));
+    const iCW   = parseFloat(indicator.getAttribute('data-cw'));
+    const iColW = iCW / iN;
+    indicator.setAttribute('x',     (iML + adjStart * iColW).toFixed(1));
+    indicator.setAttribute('width', (slice.length   * iColW).toFixed(1));
+  }
+}
+
+function nuclHoverUpdate(evt, n) {
+  const rect = evt.currentTarget.getBoundingClientRect();
+  const frac  = Math.max(0, Math.min(1 - 1e-9, (evt.clientX - rect.left) / rect.width));
+  nuclZoomCenter = Math.floor(frac * n);
+  renderNuclZoomPanel();
 }
 
 // ── Tile 5 preview: nucleotide heatmap of the most-edited sample ──────────────
