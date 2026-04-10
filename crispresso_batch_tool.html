@@ -1575,11 +1575,14 @@ function loadResults(files) {
     const isIndelHist    = fname === 'Indel_histogram.txt';
     const isRefNuclFreq  = fname === 'Reference.Nucleotide_frequency_table.txt';
     const isNuclFreq     = fname === 'Nucleotide_frequency_table.txt';
+    const isRefNuclSgRNA = fname.startsWith('Reference.Nucleotide_frequency_table_around_sgRNA_') && fname.endsWith('.txt');
+    const isNuclSgRNA    = fname.startsWith('Nucleotide_frequency_table_around_sgRNA_') && fname.endsWith('.txt');
     const isRefAlleles    = fname.startsWith('Reference.Alleles_frequency_table');
     const isSgRNAAlleles  = fname.startsWith('Alleles_frequency_table_around_sgRNA_') && fname.endsWith('.txt');
     const isAlleles       = fname === 'Alleles_frequency_table.txt' || fname === 'Alleles_frequency_table.zip';
-    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefNuclFreq && !isNuclFreq && !isRefAlleles && !isSgRNAAlleles && !isAlleles) return;
-    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, sgRNAAllelesFile: null, zipAllelesFile: null, indelHistFile: null, nuclFreqFile: null };
+    if (!isQuant && !isMap && !isRefHist && !isDelHist && !isRefIndelHist && !isIndelHist && !isRefNuclFreq && !isNuclFreq && !isRefNuclSgRNA && !isNuclSgRNA && !isRefAlleles && !isSgRNAAlleles && !isAlleles) return;
+    if (!groups[subKey]) groups[subKey] = { subName, allelesFile: null, sgRNAAllelesFile: null, zipAllelesFile: null, indelHistFile: null, nuclFreqFile: null, nuclSgRNAFile: null, sgRNASeq: '' };
+    const extractSgRNA = n => { const m = n.match(/around_sgRNA_([A-Za-z]+)/); return m ? m[1].toUpperCase() : ''; };
     if (isQuant)                                                       groups[subKey].quantFile       = f;
     else if (isMap)                                                    groups[subKey].mapFile         = f;
     else if (isRefHist)                                                groups[subKey].delHistFile     = f;
@@ -1588,8 +1591,10 @@ function loadResults(files) {
     else if (isIndelHist  && !groups[subKey].indelHistFile)            groups[subKey].indelHistFile   = f;
     else if (isRefNuclFreq)                                            groups[subKey].nuclFreqFile    = f;
     else if (isNuclFreq   && !groups[subKey].nuclFreqFile)             groups[subKey].nuclFreqFile    = f;
-    else if (isRefAlleles)                                             groups[subKey].allelesFile     = f;  // HDR: Reference.* wins outright
-    else if (isSgRNAAlleles && !groups[subKey].sgRNAAllelesFile)       groups[subKey].sgRNAAllelesFile = f; // preferred for standard runs
+    else if (isRefNuclSgRNA)                                           { groups[subKey].nuclSgRNAFile = f; if (!groups[subKey].sgRNASeq) groups[subKey].sgRNASeq = extractSgRNA(fname); }
+    else if (isNuclSgRNA  && !groups[subKey].nuclSgRNAFile)            { groups[subKey].nuclSgRNAFile = f; if (!groups[subKey].sgRNASeq) groups[subKey].sgRNASeq = extractSgRNA(fname); }
+    else if (isRefAlleles)                                             { groups[subKey].allelesFile = f; if (!groups[subKey].sgRNASeq) groups[subKey].sgRNASeq = extractSgRNA(fname); }  // HDR: Reference.* wins outright
+    else if (isSgRNAAlleles && !groups[subKey].sgRNAAllelesFile)       { groups[subKey].sgRNAAllelesFile = f; if (!groups[subKey].sgRNASeq) groups[subKey].sgRNASeq = extractSgRNA(fname); }
     else if (isAlleles    && !groups[subKey].zipAllelesFile)           groups[subKey].zipAllelesFile  = f;  // last resort fallback
   });
 
@@ -1641,7 +1646,8 @@ async function parseSample(subfolder, files) {
     delTotalReads: 0, delFsPct: 0, largeDels: [],
     hasIndelData: false, indelData: [],
     hasAllelesData: false, topAlleles: [], rawTopAlleles: [],
-    hasNuclData: false, nuclData: []
+    hasNuclData: false, nuclData: [],
+    hasNuclSgRNAData: false, nuclSgRNAData: [], sgRNASeq: files.sgRNASeq || ''
   };
 
   const safeRead = (file, label) =>
@@ -1649,12 +1655,13 @@ async function parseSample(subfolder, files) {
       parseErrors.push(`${name}: failed to read ${label} — ${e.message}`); return null;
     }) : Promise.resolve(null);
 
-  const [mapText, quantText, delHistText, indelHistText, nuclFreqText] = await Promise.all([
+  const [mapText, quantText, delHistText, indelHistText, nuclFreqText, nuclSgRNAText] = await Promise.all([
     safeRead(files.mapFile,       'CRISPResso_mapping_statistics.txt'),
     safeRead(files.quantFile,     'CRISPResso_quantification_of_editing_frequency.txt'),
     safeRead(files.delHistFile,   'deletion histogram'),
     safeRead(files.indelHistFile, 'indel histogram'),
     safeRead(files.nuclFreqFile,  'nucleotide frequency table'),
+    safeRead(files.nuclSgRNAFile, 'nucleotide frequency table around sgRNA'),
   ]);
 
   if (mapText) {
@@ -1741,7 +1748,7 @@ async function parseSample(subfolder, files) {
     if (lines.length >= 2) {
       const headerFields = lines[0].split('\t');
       const numPos = headerFields.length - 1; // first field is empty label
-      const data   = Array.from({ length: numPos }, (_, i) => ({ pos: i + 1, A: 0, T: 0, C: 0, G: 0, N: 0, ins: 0, del: 0 }));
+      const data   = Array.from({ length: numPos }, (_, i) => ({ pos: i + 1, ref: (headerFields[i + 1] || '').charAt(0).toUpperCase(), A: 0, T: 0, C: 0, G: 0, N: 0, ins: 0, del: 0 }));
 
       lines.slice(1).forEach(line => {
         const fields = line.split('\t');
@@ -1760,6 +1767,45 @@ async function parseSample(subfolder, files) {
 
       result.nuclData    = data;
       result.hasNuclData = data.length > 0;
+    }
+  }
+
+  if (nuclSgRNAText) {
+    const lines = nuclSgRNAText.split('\n').map(l => l.trimEnd()).filter(l => l.length);
+    if (lines.length >= 2) {
+      const headerFields = lines[0].split('\t');
+      const numPos = headerFields.length - 1;
+      const data   = Array.from({ length: numPos }, (_, i) => ({ pos: i + 1, ref: (headerFields[i + 1] || '').charAt(0).toUpperCase(), A: 0, T: 0, C: 0, G: 0, N: 0, ins: 0, del: 0 }));
+      lines.slice(1).forEach(line => {
+        const fields = line.split('\t');
+        const label  = fields[0].trim();
+        const key = label === 'A' ? 'A' : label === 'T' ? 'T' : label === 'C' ? 'C'
+                  : label === 'G' ? 'G' : label === 'N' ? 'N'
+                  : (label === '-' || label.toLowerCase().startsWith('del')) ? 'del'
+                  : label.toLowerCase().startsWith('ins') ? 'ins'
+                  : null;
+        if (!key) return;
+        for (let i = 0; i < numPos && i + 1 < fields.length; i++) {
+          data[i][key] += parseFloat(fields[i + 1]) || 0;
+        }
+      });
+      result.nuclSgRNAData    = data;
+      result.hasNuclSgRNAData = data.length > 0;
+    }
+  }
+
+  // Derive sgRNA close-up from full amplicon table when no separate around_sgRNA file exists
+  if (!result.hasNuclSgRNAData && result.hasNuclData && result.sgRNASeq) {
+    const refStr = result.nuclData.map(d => d.ref || '').join('').toUpperCase();
+    const fwd    = result.sgRNASeq.toUpperCase();
+    let   idx    = refStr.indexOf(fwd);
+    if (idx < 0) idx = refStr.indexOf(revComp(fwd));
+    if (idx >= 0) {
+      const FLANK = 10;
+      const start = Math.max(0, idx - FLANK);
+      const end   = Math.min(result.nuclData.length - 1, idx + result.sgRNASeq.length - 1 + FLANK);
+      result.nuclSgRNAData    = result.nuclData.slice(start, end + 1);
+      result.hasNuclSgRNAData = true;
     }
   }
 
@@ -2904,79 +2950,153 @@ function renderNuclView() {
 
   const r       = withData[nuclSelectedSample];
   const showDel = document.getElementById('nucl-del-toggle')?.checked ?? true;
-  area.innerHTML = drawNuclSvg(r, showDel);
+  let html = drawNuclSvg(r, showDel, 'full');
+  if (r.hasNuclSgRNAData) {
+    const sgLabel = r.sgRNASeq ? ` — ${escapeHtml(r.sgRNASeq)}` : '';
+    html += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:20px 0 6px;padding-top:12px;border-top:1px solid var(--border)">Around sgRNA${sgLabel}</div>`;
+    html += drawNuclSvg(r, showDel, 'sgrna');
+  }
+  area.innerHTML = html;
 }
 
-function drawNuclSvg(r, showDel) {
-  const NUC_C = { A: '#3fb950', T: '#d2a8ff', C: '#ffa657', G: '#e3b341', N: '#484f58' };
+function drawNuclSvg(r, showDel, mode = 'full') {
+  const NUC_C    = { A: '#3fb950', T: '#d2a8ff', C: '#ffa657', G: '#e3b341', N: '#484f58' };
   const usePosMode = nuclYAxisMode === 'pos';
 
-  const data = r.nuclData;
+  const data = (mode === 'sgrna' && r.hasNuclSgRNAData) ? r.nuclSgRNAData : r.nuclData;
   if (!data.length) return '';
 
-  const W = 900, H = 200;
-  const ML = 14, MR = 10, MT = 8, MB = 18;
-  const DEL_H = showDel ? 28 : 0;
-  const GAP   = showDel ?  6 : 0;
-  const cW    = W - ML - MR;
-  const cH    = H - MT - MB - DEL_H - GAP;
-  const n     = data.length;
-  const colW  = cW / n;
-  const aln   = r.alignedAllAmplicons || 1;
+  const aln = r.alignedAllAmplicons || 1;
 
+  // Locate sgRNA in this data window's reference sequence — runs in both modes
+  // so the full-amplicon chart can also show the bracket.
+  let sgRNARange = null;
+  if (r.sgRNASeq && data.length) {
+    const refStr = data.map(d => d.ref || '').join('').toUpperCase();
+    const fwd    = r.sgRNASeq.toUpperCase();
+    let   idx    = refStr.indexOf(fwd);
+    if (idx < 0) idx = refStr.indexOf(revComp(fwd));
+    if (idx >= 0) sgRNARange = { start: idx, end: idx + r.sgRNASeq.length - 1 };
+  }
+
+  const W  = 900;
+  const ML = 30, MR = 14, MT = 10;
+  const cW = W - ML - MR;
+  const n  = data.length;
+  const colW = cW / n;
+
+  // Zone heights — sgRNA row only allocated when its position is known
+  const DEL_H       = showDel ? (mode === 'sgrna' ? 36 : 28) : 0;
+  const GAP         = showDel ? 6 : 0;
+  const BASE_H      = mode === 'sgrna' ? 160 : 120;
+  const REF_H       = mode === 'sgrna' ? 22 : 12;
+  const SGRNA_ROW_H = sgRNARange ? (mode === 'sgrna' ? 24 : 16) : 0;
+
+  // Y zone tops
   const delTop  = MT;
   const baseTop = MT + DEL_H + GAP;
+  const baseBot = baseTop + BASE_H;
+  const refTop  = baseBot + 3;
+  const sgTop   = refTop + REF_H + 2;
+  const xlabTop = sgTop + SGRNA_ROW_H;
+  const H       = xlabTop + 18 + 4;
 
   let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible" font-family="'IBM Plex Mono',monospace">`;
 
   // Base area background
-  svg += `<rect x="${ML}" y="${baseTop}" width="${cW}" height="${cH}" fill="#161b22"/>`;
+  svg += `<rect x="${ML}" y="${baseTop}" width="${cW}" height="${BASE_H}" fill="#161b22"/>`;
 
   data.forEach((d, i) => {
     const x = ML + i * colW;
     const w = Math.max(colW - 0.2, 0.2);
 
-    // Deletion bar (drawn downward from top of del area)
+    // ─ Deletion bar (grows downward from del area baseline) ─
     if (showDel && d.del > 0) {
       const dh = Math.min((d.del / aln) * DEL_H, DEL_H);
       svg += `<rect x="${x.toFixed(1)}" y="${(delTop + DEL_H - dh).toFixed(1)}" width="${w.toFixed(1)}" height="${dh.toFixed(1)}" fill="#484f58"/>`;
     }
 
-    // Stacked base bars — order bottom→top: N, G, C, T, A
+    // ─ Stacked base bars (bottom→top: N, G, C, T, A) ─
     const total = usePosMode ? Math.max(d.A + d.T + d.C + d.G + d.N, 1) : aln;
-    let cumH = 0;
+    let cumH = 0, domH = 0, domCount = 0, domCumHStart = 0;
     for (const b of ['N', 'G', 'C', 'T', 'A']) {
       const count = d[b];
       if (!count) continue;
-      const h = (count / total) * cH;
+      const h = (count / total) * BASE_H;
       if (h < 0.05) { cumH += h; continue; }
-      const by = baseTop + cH - cumH - h;
-      svg += `<rect x="${x.toFixed(1)}" y="${by.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${NUC_C[b]}"/>`;
+      svg += `<rect x="${x.toFixed(1)}" y="${(baseBot - cumH - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${NUC_C[b]}"/>`;
+      if (h > domH) { domH = h; domCount = count; domCumHStart = cumH; }
       cumH += h;
+    }
+
+    // ─ % label on dominant bar ─
+    // Always use % of aligned reads (matches native CRISPResso output).
+    // Full mode: only label where dominant base has dropped (editing hotspots).
+    // sgRNA mode: label every column wide/tall enough to fit the text.
+    const domPct    = (domCount / aln) * 100;
+    const showLabel = domH >= 10 && colW >= 7 && (mode === 'sgrna' ? domH >= 14 : domPct < 94);
+    if (showLabel) {
+      const cx = x + colW / 2;
+      const cy = baseBot - domCumHStart - domH / 2;
+      const fs = mode === 'sgrna' ? 8.5 : 7;
+      svg += `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="#fff" fill-opacity="0.9" font-size="${fs}" transform="rotate(-90,${cx.toFixed(1)},${cy.toFixed(1)})">${domPct.toFixed(1)}%</text>`;
+    }
+
+    // ─ Reference letter ─
+    const refBase  = (d.ref || '').charAt(0).toUpperCase();
+    const refColor = NUC_C[refBase] || '#7d8590';
+    if (refBase && 'ATCGN'.includes(refBase)) {
+      if (mode === 'sgrna') {
+        // Colored background box + letter
+        const bh = REF_H - 1;
+        svg += `<rect x="${x.toFixed(1)}" y="${refTop}" width="${w.toFixed(1)}" height="${bh}" fill="${refColor}" opacity="0.75"/>`;
+        if (colW >= 9) {
+          const fs = Math.min(colW * 0.65, 13).toFixed(1);
+          svg += `<text x="${(x + colW / 2).toFixed(1)}" y="${(refTop + bh * 0.74).toFixed(1)}" text-anchor="middle" fill="#000" font-size="${fs}" font-weight="600">${refBase}</text>`;
+        }
+      } else {
+        // Full amplicon: small colored text (or color swatch when columns are very narrow)
+        if (colW >= 5) {
+          svg += `<text x="${(x + colW / 2).toFixed(1)}" y="${(refTop + 9).toFixed(1)}" text-anchor="middle" fill="${refColor}" font-size="7">${refBase}</text>`;
+        } else {
+          svg += `<rect x="${x.toFixed(1)}" y="${(refTop + 2).toFixed(1)}" width="${w.toFixed(1)}" height="${(REF_H - 4).toFixed(1)}" fill="${refColor}" opacity="0.5"/>`;
+        }
+      }
     }
   });
 
-  // Baselines
-  svg += `<line x1="${ML}" y1="${baseTop + cH}" x2="${ML + cW}" y2="${baseTop + cH}" stroke="#30363d" stroke-width="1"/>`;
+  // ─ Baselines ─
+  svg += `<line x1="${ML}" y1="${baseBot}" x2="${ML + cW}" y2="${baseBot}" stroke="#30363d" stroke-width="1"/>`;
   if (showDel) {
     svg += `<line x1="${ML}" y1="${delTop + DEL_H}" x2="${ML + cW}" y2="${delTop + DEL_H}" stroke="#30363d" stroke-width="1"/>`;
-    // Del area label
     svg += `<text x="${ML + cW + 4}" y="${delTop + DEL_H - 2}" fill="#7d8590" font-size="7">del</text>`;
   }
 
-  // X-axis tick labels (position numbers)
+  // ─ sgRNA bracket (both modes, when position was found in the reference) ─
+  if (sgRNARange) {
+    const bx   = ML + sgRNARange.start * colW;
+    const bw   = (sgRNARange.end - sgRNARange.start + 1) * colW;
+    const barH = mode === 'sgrna' ? 8 : 5;
+    const barY = sgTop + 2;
+    const lblY = barY + barH + (mode === 'sgrna' ? 11 : 8);
+    const lblFs = mode === 'sgrna' ? 9 : 7;
+    svg += `<rect x="${bx.toFixed(1)}" y="${barY}" width="${bw.toFixed(1)}" height="${barH}" fill="#7d8590" opacity="0.45" rx="2"/>`;
+    svg += `<text x="${(bx + bw / 2).toFixed(1)}" y="${lblY}" text-anchor="middle" fill="#7d8590" font-size="${lblFs}">sgRNA</text>`;
+  }
+
+  // ─ X-axis position labels ─
   const step = n <= 50 ? 5 : n <= 150 ? 10 : n <= 300 ? 25 : n <= 600 ? 50 : 100;
   const seenPos = new Set();
   data.forEach((d, i) => {
     if (d.pos % step !== 0) return;
     if (seenPos.has(d.pos)) return; seenPos.add(d.pos);
     const tx = (ML + i * colW + colW / 2).toFixed(1);
-    svg += `<text x="${tx}" y="${H - 3}" text-anchor="middle" fill="#7d8590" font-size="8">${d.pos}</text>`;
+    svg += `<text x="${tx}" y="${xlabTop + 12}" text-anchor="middle" fill="#7d8590" font-size="8">${d.pos}</text>`;
   });
 
-  // Y-axis corner labels
+  // ─ Y-axis labels ─
   svg += `<text x="${ML - 2}" y="${baseTop + 7}" text-anchor="end" fill="#7d8590" font-size="7">100%</text>`;
-  svg += `<text x="${ML - 2}" y="${baseTop + cH}" text-anchor="end" fill="#7d8590" font-size="7">0</text>`;
+  svg += `<text x="${ML - 2}" y="${baseBot}" text-anchor="end" fill="#7d8590" font-size="7">0</text>`;
 
   svg += '</svg>';
   return svg;
