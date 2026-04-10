@@ -182,16 +182,6 @@ CRISPRessoBatch --batch_settings NGS_Editing.batch \
 | CRISPRessoCompare | Comparing two samples (e.g. treated vs. untreated) |
 | CRISPRessoAggregate | Aggregating results from previous runs |
 
----
-
-## Roadmap
-
-- [ ] 96-well plate heatmap visualization of editing rates
-- [ ] CRISPRessoCompare batch pairing for treated vs. untreated samples
-- [ ] Run history to save and reload previous batch configurations
-- [ ] CRISPRessoPooled batch file generation support
-
----
 
 ## Contributing
 
