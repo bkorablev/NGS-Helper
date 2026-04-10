@@ -9,10 +9,11 @@ A single self-contained HTML file for building [CRISPRessoBatch](https://github.
 ## Features at a Glance
 
 - Auto-detects Illumina R1/R2 pairs from standard naming
-- Editable sample table with fill-down, Enter-key row navigation, and per-row delete
+- Editable sample table with fill-down, Enter-key row navigation, per-row delete, and per-sample quantification window center (`wc`)
 - Pre-run validation: missing sequences, guide not in amplicon, unusual guide lengths, duplicate names, incomplete pairs
 - Generates a correctly formatted `.batch` file and ready-to-run terminal command
-- Results aggregator: parses a CRISPRessoBatch output folder and produces a summary table, stacked bar charts, and Excel export
+- Results aggregator with a dashboard of five analysis views: Summary, Editing Breakdown, Indel Distribution, Top Alleles, and Nucleotide Composition
+- Sample-to-sample comparison panel with Excel export
 - Optional KO classification using allele frequency tables — no reload required
 
 ---
@@ -29,7 +30,7 @@ A single self-contained HTML file for building [CRISPRessoBatch](https://github.
 Drag and drop or browse for Illumina paired-end FASTQ files. The tool auto-detects R1/R2 pairs from standard Illumina naming (`SampleA_S1_L001_R1_001.fastq.gz`) and reports complete pairs vs unpaired files.
 
 **Step 2 — Edit Samples**
-An editable table pre-populated with detected sample names. Columns: sample name, R1/R2 filenames, amplicon sequence, guide RNA, and optional HDR template. Supports Excel-like Enter key navigation between rows, a fill-down button to propagate a value to all rows below, and per-row delete.
+An editable table pre-populated with detected sample names. Columns: sample name, R1/R2 filenames, amplicon sequence, guide RNA, optional HDR template, and quantification window center (`wc`). The `wc` column has a preset dropdown (−3 for Cas9, +1 for Cpf1/Cas12a) with a custom numeric entry option. Supports Excel-like Enter key navigation between rows, fill-down buttons to propagate a value to all rows below, and per-row delete.
 
 **Step 3 — Global Parameters**
 Set CRISPRessoBatch parameters that apply to all samples: output folder, quantification window size, minimum allele frequency to plot, and skip-failed-samples toggle. Only non-default values are included in the generated run command.
@@ -42,15 +43,45 @@ Preview the formatted tab-separated `.batch` file, copy the generated `CRISPRess
 
 ### Results Aggregator (Tab 6)
 
-Browse and select a CRISPRessoBatch output folder. The tool automatically finds and parses all `CRISPResso_on_<samplename>` subfolders.
+Browse and select a CRISPRessoBatch output folder. The tool automatically finds and parses all `CRISPResso_on_<samplename>` subfolders and presents results through a dashboard of analysis views.
 
-**Summary table columns:**
-Sample name · Reads in Input · Reads Aligned · Aligned % · Unmodified reads + % · NHEJ reads + % · HDR reads + % (if HDR template was used) · Ambiguous reads + %
+---
 
-**Also includes:**
-- Stacked SVG bar chart per sample (Unmodified / NHEJ / HDR / Ambiguous), color-coded to match the tool theme
-- Loading spinner with status messages during parsing
-- Excel export (`.xlsx`) with two sheets: Summary and Raw data
+## Results Dashboard
+
+After loading a results folder, a tile dashboard gives one-click access to five views:
+
+### Summary
+
+Tabular overview of all samples. Columns:
+
+Sample name · Reads in Input · Reads Aligned · Aligned % · Unmodified reads + % · NHEJ reads + % · HDR reads + % (when HDR template was used) · Ambiguous reads + %
+
+- Rows are sortable and selectable for cross-sample comparison
+- Excel export (`.xlsx`) with Summary and Raw data sheets
+
+### Editing Breakdown
+
+Stacked SVG bar chart per sample showing the proportion of Unmodified / NHEJ / HDR / Ambiguous reads, color-coded to match the tool theme.
+
+**Sample comparison panel:** select any rows in the Summary table to open a floating comparison panel showing their breakdown bars side by side. Includes its own Excel export.
+
+### Indel Distribution
+
+Per-sample bar chart of insertion and deletion sizes, derived from `Reference.Indel_histogram.txt` (or `Indel_histogram.txt` for non-HDR runs). Toggle to show/hide frameshift markers. Sample selector chips at the top allow switching between samples without leaving the view.
+
+### Top Alleles
+
+Sequence-level visualization of the most frequent editing outcomes for a selected sample, drawn from the allele frequency tables. Displays each allele's sequence with mismatches, insertions, and deletions highlighted, alongside read count and frequency. Distinguishes alleles that align to the Reference amplicon from those classified as HDR.
+
+### Nucleotide Composition
+
+Per-position stacked base-frequency heatmap (A / T / C / G, with optional deletion track) derived from `Nucleotide_frequency_table.txt` (or `Reference.Nucleotide_frequency_table.txt` for HDR runs).
+
+- **Full amplicon view** at the top shows the entire reference with a compact heatmap. The sgRNA position is bracketed when its sequence is known.
+- **50 nt zoom panel** below shows a magnified view of any 50-nucleotide window. Hover over the full amplicon chart to pan the zoom window; the active window is highlighted with a selection rectangle on the full chart. Position is preserved when the mouse leaves. Switching samples resets the zoom to the sgRNA midpoint.
+- Y-axis toggle between *% of aligned reads* and *% of bases at position*.
+- Compatible with both standard and HDR CRISPResso output folder layouts.
 
 ---
 
@@ -63,7 +94,7 @@ Disabled by default. Enable the toggle in the Results tab — no reload required
 - In-frame deletion override (bp) — in-frame deletions ≥ this size are reclassified as likely disruptive
 
 **How it works:**
-Parses `Alleles_frequency_table.zip` per sample. Groups alleles by deletion/insertion signature and takes the top N alleles by frequency, where N = ploidy setting.
+Parses allele frequency tables per sample (prefers `Reference.Alleles_frequency_table_around_sgRNA_*.txt` for HDR runs, falls back to `Alleles_frequency_table_around_sgRNA_*.txt`, then zip). Groups alleles by deletion/insertion signature and takes the top N alleles by frequency, where N = ploidy setting.
 
 **Per-allele types:** Wildtype · Frameshift · In-frame · Large in-frame deletion · Substitution only
 
@@ -76,7 +107,7 @@ Parses `Alleles_frequency_table.zip` per sample. Groups alleles by deletion/inse
 | **Partial KO** | At least one allele is Wildtype alongside edited alleles |
 | **No KO** | All alleles Wildtype |
 
-Warnings are shown for in-frame mutations and large deletions that may span exon-intron boundaries. An allele breakdown and KO status are included in the Excel export.
+Warnings are shown for in-frame mutations and large deletions that may span exon-intron boundaries. KO status and allele breakdown are included in the Excel export.
 
 ---
 
