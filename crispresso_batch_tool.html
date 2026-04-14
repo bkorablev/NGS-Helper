@@ -612,6 +612,23 @@
     gap: 14px;
     flex-wrap: wrap;
   }
+  .allele-ko-status {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 8px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .allele-ko-alleles {
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
   .allele-sample-body { padding: 12px 14px; overflow-x: auto; }
   .allele-seq-table {
     border-collapse: collapse;
@@ -833,7 +850,6 @@
           <div class="dash-tile-icon"></div>
           <div class="dash-tile-title">Summary</div>
           <div class="dash-tile-desc">Editing efficiency across all samples</div>
-          <div id="ko-tile-indicator" style="margin-top:5px;font-size:11px;font-family:var(--mono);color:var(--muted)">KO: off</div>
         </div>
         <div class="dash-tile-preview" id="tile-preview-summary">
           <div class="dash-tile-empty-msg">Load a results folder to preview</div>
@@ -870,6 +886,7 @@
           <div class="dash-tile-icon"></div>
           <div class="dash-tile-title">Top Alleles</div>
           <div class="dash-tile-desc">Sequence-level view of the most frequent editing outcomes</div>
+          <div id="ko-tile-indicator" style="margin-top:5px;font-size:11px;font-family:var(--mono);color:var(--muted)">KO: off</div>
         </div>
         <div class="dash-tile-preview" id="tile-preview-alleles">
           <div class="dash-tile-empty-msg">Load a results folder to preview</div>
@@ -884,35 +901,6 @@
     <div class="btn-row" style="margin-top:0;margin-bottom:16px">
       <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
     </div>
-
-    <div class="card" id="ko-settings-card">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div class="card-title" style="margin-bottom:0">KO Classification</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:13px;font-family:var(--mono);color:var(--muted)">Enable KO Classification</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="ko-enabled" onchange="onKOToggle()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-      <div id="ko-settings-body" style="display:none;margin-top:12px">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Expected allele copies</label>
-            <input type="number" id="ko-ploidy" value="2" min="1" max="20" style="width:80px" oninput="reEvalKO()">
-            <div class="helper-text">e.g. 2 for diploid (RPE-1), 3 for triploid (K562)</div>
-          </div>
-          <div class="form-group">
-            <label>In-frame deletion override (bp)</label>
-            <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
-            <div class="helper-text">In-frame deletions ≥ this size reclassified as likely disruptive</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
 
     <div class="card">
       <div class="card-title">Summary</div>
@@ -965,6 +953,36 @@
     <div class="btn-row" style="margin-top:0;margin-bottom:16px">
       <button class="btn btn-secondary" onclick="showResultsView('dashboard')">← Back to Results</button>
     </div>
+
+    <div class="card" id="ko-settings-card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title" style="margin-bottom:0">KO Classification</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px;font-family:var(--mono);color:var(--muted)">Enable KO Classification</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ko-enabled" onchange="onKOToggle()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div id="ko-settings-body" style="display:none;margin-top:12px">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expected allele copies</label>
+            <input type="number" id="ko-ploidy" value="2" min="1" max="20" style="width:80px" oninput="reEvalKO()">
+            <div class="helper-text">e.g. 2 for diploid (RPE-1), 3 for triploid (K562)</div>
+          </div>
+          <div class="form-group">
+            <label>In-frame deletion override (bp)</label>
+            <input type="number" id="ko-large-del" value="50" min="1" style="width:80px" oninput="reEvalKO()">
+            <div class="helper-text">In-frame deletions ≥ this size reclassified as likely disruptive</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="ko-summary-bar" style="display:none;gap:14px;align-items:center;font-size:13px;font-family:var(--mono);padding:10px 0 4px"></div>
+
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <div class="card-title" style="margin-bottom:0">Top allele sequences</div>
@@ -1720,8 +1738,6 @@ function buildKOCellHTML(r, idx) {
 function renderResultsTable() {
   const anyHDR       = resultsData.some(r => r.hasHDR);
   const anyAmbiguous = anyHDR && resultsData.some(r => r.ambiguous > 0);
-  const koVisible    = koEnabled() && resultsLoadedWithKO;
-  const koHiddenClass = koVisible ? '' : ' ko-hidden';
 
   let html = `<table><thead><tr>
     <th class="check-col"></th>
@@ -1733,7 +1749,6 @@ function renderResultsTable() {
     <th>NHEJ</th>
     ${anyHDR ? '<th>HDR</th>' : ''}
     ${anyAmbiguous ? '<th>Ambiguous</th>' : ''}
-    <th class="ko-col${koHiddenClass}">KO Status</th>
   </tr></thead><tbody>`;
 
   resultsData.forEach((r, idx) => {
@@ -1746,14 +1761,10 @@ function renderResultsTable() {
         ${checkHtml}
         <td style="font-family:var(--mono);color:var(--error)">${r.name}</td>
         <td colspan="6" style="color:var(--muted);font-size:12px">Failed — see parse errors below</td>
-        <td class="ko-col${koHiddenClass}" data-sample-index="${idx}" data-ko-cell></td>
       </tr>`;
       return;
     }
     const nhejColor = r.nhejPct > 0 ? 'var(--warn)' : 'var(--muted)';
-    const koTD = koVisible
-      ? buildKOCellHTML(r, idx)
-      : `<td class="ko-col ko-hidden" data-sample-index="${idx}" data-ko-cell></td>`;
     html += `<tr id="result-row-${idx}" class="results-row-selectable${selClass}" onclick="toggleSelection(${idx})">
       ${checkHtml}
       <td style="font-family:var(--mono);color:var(--accent)">${r.name}</td>
@@ -1764,7 +1775,6 @@ function renderResultsTable() {
       <td style="font-family:var(--mono);color:${nhejColor}">${r.nhej.toLocaleString()} <span>(${r.nhejPct.toFixed(1)}%)</span></td>
       ${anyHDR ? `<td style="font-family:var(--mono);color:var(--accent2)">${r.hasHDR ? r.totalHDR.toLocaleString() + ' <span>(' + r.hdrPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
       ${anyAmbiguous ? `<td style="font-family:var(--mono);color:var(--muted)">${r.ambiguous > 0 ? r.ambiguous.toLocaleString() + ' <span>(' + r.ambiguousPct.toFixed(1) + '%)</span>' : '—'}</td>` : ''}
-      ${koTD}
     </tr>`;
   });
 
@@ -2345,8 +2355,8 @@ function onKOToggle() {
   updateKOTileIndicator();
   if (!resultsData.length) return;
   if (enabled && !resultsLoadedWithKO) runKOOnDemand();
-  else if (enabled) { showKOColumn(); renderKOSummaryBar(); renderTilePreviewSummary(); }
-  else              { hideKOColumn(); renderKOSummaryBar(); renderTilePreviewSummary(); }
+  else if (enabled) { renderKOSummaryBar(); renderAllelesView(); renderTilePreviewAlleles(); }
+  else              { renderKOSummaryBar(); renderAllelesView(); renderTilePreviewAlleles(); }
 }
 
 function updateKOTileIndicator() {
@@ -2369,9 +2379,9 @@ async function runKOOnDemand(showFullSpinner = true) {
       return parseAllelesIntoResult(r, r.allelesFileRef);
     }));
     resultsLoadedWithKO = true;
-    updateKOCells();
-    showKOColumn();
     renderKOSummaryBar();
+    renderAllelesView();
+    renderTilePreviewAlleles();
   } catch (e) {
     console.error('KO classification failed:', e);
   } finally {
@@ -2382,8 +2392,8 @@ async function runKOOnDemand(showFullSpinner = true) {
 
 function reEvalKO() {
   if (!resultsData.length) return;
-  updateKOCells();
   renderKOSummaryBar();
+  renderAllelesView();
 }
 
 // ─── Section 10: Excel export ─────────────────────────────────────────────────
@@ -2614,6 +2624,12 @@ async function loadAndShowAlleles() {
     }
     hideSpinner();
   }
+  // Allele data is the same data KO classification uses — mark it loaded so
+  // KO status renders immediately if the toggle is already on.
+  if (!resultsLoadedWithKO && resultsData.every(r => r.failed || r.hasAllelesData)) {
+    resultsLoadedWithKO = true;
+  }
+  if (koEnabled()) renderKOSummaryBar();
   showResultsView('alleles');
 }
 
@@ -2673,6 +2689,19 @@ function renderSampleAlleles(r, topN) {
     </tr>`;
   });
 
+  let koHtml = '';
+  if (koEnabled() && resultsLoadedWithKO && r.hasAllelesData) {
+    const { status, warnings, alleles: koAlleles } = classifyKO(r);
+    const typeColor = { 'Frameshift': '#3fb950', 'Large in-frame deletion': '#58a6ff', 'In-frame': '#d29922', 'Wildtype': '#7d8590', 'Substitution only': '#7d8590' };
+    const typeIcon  = { 'Frameshift': ' ✓', 'Large in-frame deletion': ' ℹ', 'In-frame': ' ⚠', 'Wildtype': '', 'Substitution only': '' };
+    const alleleRows = (koAlleles || []).map((a, i) =>
+      `<span style="display:inline-block;margin-right:10px">Allele ${i+1}: <span style="color:var(--muted)">${a.freq.toFixed(1)}%</span> — <span style="color:${typeColor[a.type]||'#7d8590'}">${a.type}${typeIcon[a.type]||''} (${alleleLabel(a)})</span></span>`
+    ).join('');
+    const warnHtml = warnings.length
+      ? `<div style="margin-top:4px;font-size:10px;font-family:var(--mono);color:var(--muted)">${warnings.join('<br>')}</div>` : '';
+    koHtml = `<div class="allele-ko-status">${koStatusBadge(status)}${alleleRows ? `<span class="allele-ko-alleles">${alleleRows}</span>` : ''}${warnHtml}</div>`;
+  }
+
   return `<div class="allele-sample-block">
     <div class="allele-sample-header">
       <span class="allele-sample-name">${escapeHtml(r.name)}</span>
@@ -2682,6 +2711,7 @@ function renderSampleAlleles(r, topN) {
         <span>${r.rawTopAlleles.length} allele types</span>
       </span>
     </div>
+    ${koHtml}
     <div class="allele-sample-body">
       <table class="allele-seq-table"><tbody>${rows}</tbody></table>
     </div>
